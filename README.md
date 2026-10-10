@@ -1,5 +1,9 @@
 # CodeCounter
 
+[![CI](https://github.com/linfunss/codecounter/actions/workflows/ci.yml/badge.svg)](https://github.com/linfunss/codecounter/actions/workflows/ci.yml)
+[![Release](https://github.com/linfunss/codecounter/actions/workflows/release.yml/badge.svg)](https://github.com/linfunss/codecounter/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 一个 Windows 原生的代码行数统计小工具：扫描指定目录或文件，自动跳过
 `node_modules`、`.idea` 等冗余内容，并以「排行榜 + 条形图 + 语言图标」
 直观展示各语言的代码量。
@@ -16,7 +20,7 @@
 - 可选择读取统计目录下的 `.gitignore`
 - 排行榜 + 横向条形图，按代码行数降序展示，并显示真实语言 logo
 - 统计结果可导出为 JSON
-- 无控制台窗口，支持高 DPI，无需任何运行时依赖
+- 无控制台窗口，应用图标已嵌入，支持高 DPI，无需任何运行时依赖
 - 附带命令行模式，便于在脚本或 CI 中使用
 
 ## 设置
@@ -43,9 +47,9 @@
 | P1 | 计数引擎与排除规则 | ✅ 已完成 |
 | P2 | 原生主界面与条形图 | ✅ 已完成 |
 | P3 | 设置对话框与目录选择 | ✅ 已完成 |
-| P4 | 资源文件与高 DPI | 🚧 部分完成（清单已接入，图标待补） |
-| P5 | CI/CD 与自动发布 | ⏳ 未开始 |
-| P6 | 文档与验收 | ⏳ 未开始 |
+| P4 | 资源文件与高 DPI | ✅ 已完成 |
+| P5 | CI/CD 与自动发布 | ✅ 已完成 |
+| P6 | 文档与验收 | 🚧 进行中 |
 
 ## 环境要求
 
@@ -114,6 +118,7 @@ codecounter --version
 ## 文档
 
 - [开发计划](docs/开发计划.md)
+- [发布流程](docs/发布流程.md)
 - [贡献指南](CONTRIBUTING.md)
 - [变更记录](CHANGELOG.md)
 - [安全策略](SECURITY.md)
