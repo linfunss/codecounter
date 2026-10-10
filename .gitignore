@@ -1,0 +1,84 @@
+# ============================================================
+# CodeCounter .gitignore
+# 本仓库为公开仓库，以下规则从初始提交起生效，用于防止构建产物、
+# 本地配置、密钥与个人环境信息被意外提交。
+# ============================================================
+
+# ---------- Go 构建产物 ----------
+/codecounter
+/codecounter.exe
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.syso
+dist/
+build/
+bin/
+obj/
+
+# ---------- Go 工作区 ----------
+/vendor/
+go.work
+go.work.sum
+*.pprof
+coverage.txt
+coverage.out
+coverage.html
+
+# ---------- 本地配置与密钥（严禁提交）----------
+config.json
+config.local.json
+.env
+.env.*
+*.local
+*.local.json
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+*_secret.*
+*credentials*
+
+# ---------- 日志与临时文件 ----------
+*.log
+logs/
+tmp/
+temp/
+.task/
+*.tmp
+*.bak
+*.orig
+*.rej
+*~
+Thumbs.db
+Desktop.ini
+
+# ---------- 编辑器 / IDE ----------
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.vs/
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+
+# ---------- 操作系统 ----------
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+$RECYCLE.BIN/
+
+# ---------- 本地工具缓存 ----------
+.golangci-lint-cache/
+.cache/
+node_modules/
+__pycache__/
