@@ -1,0 +1,62 @@
+name: 缺陷报告
+description: 报告一个可复现的问题
+title: "[缺陷] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请尽量填写完整信息，便于快速定位问题。
+        提交前请注意：不要粘贴真实项目路径、用户名、密钥等隐私信息。
+
+  - type: input
+    id: version
+    attributes:
+      label: CodeCounter 版本
+      description: 可在「设置 → 关于」查看，或执行 codecounter --version
+      placeholder: v0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows 版本
+      description: 例如 Windows 11 23H2
+      placeholder: Windows 11 23H2
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开程序
+        2. 点击「选择目录」并选中示例工程
+        3. 观察到 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 如果有错误提示或异常数据，请一并贴出
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息
+      description: 截图、相关文件类型、项目大致规模等
+    validations:
+      required: false

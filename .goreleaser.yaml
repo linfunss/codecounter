@@ -1,0 +1,66 @@
+# GoReleaser 配置：在推送 v* 标签时构建并发布 Windows 版本。
+# 配置格式版本，对应 GoReleaser v2。
+version: 2
+
+project_name: codecounter
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: codecounter
+    main: ./cmd/codecounter
+    binary: codecounter
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      # -H=windowsgui 隐藏控制台窗口
+      - -s -w -H=windowsgui
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    formats:
+      - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+  groups:
+    - title: 新增功能
+      regexp: "^feat:"
+      order: 0
+    - title: 缺陷修复
+      regexp: "^fix:"
+      order: 1
+    - title: 其他变更
+      order: 999
+
+release:
+  draft: false
+  prerelease: auto
+  name_template: "CodeCounter {{.Version}}"

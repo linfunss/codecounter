@@ -1,0 +1,47 @@
+# 发布：推送 v* 标签时校验、测试、构建并发布 Release。
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 构建并发布
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: 安装 Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: 校验标签格式
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z.\-]+)?$') {
+            Write-Error "标签 $tag 不符合 vX.Y.Z 或 vX.Y.Z-预发布 的格式"
+            exit 1
+          }
+          Write-Output "标签 $tag 格式正确"
+
+      - name: 运行测试
+        run: go test -count=1 ./...
+
+      - name: 使用 GoReleaser 发布
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
