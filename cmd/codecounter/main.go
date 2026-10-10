@@ -121,8 +121,7 @@ func run() error {
 		return encoder.Encode(res)
 	}
 
-	renderText(os.Stdout, res, *topN)
-	return nil
+	return renderText(os.Stdout, res, *topN)
 }
 
 // buildMatcher 依据参数构建排除规则匹配器。
@@ -160,14 +159,16 @@ func splitList(raw string) []string {
 }
 
 // renderText 以文本排行榜的形式输出统计结果。
-func renderText(w io.Writer, res *counter.Result, topN int) {
+func renderText(w io.Writer, res *counter.Result, topN int) error {
+	out := &errWriter{w: w}
+
 	root := res.Root
 	if root == "" {
 		root = "用户选择的文件"
 	}
 
-	fmt.Fprintf(w, "统计范围: %s\n", root)
-	fmt.Fprintf(w, "已统计 %d 个文件 / %s，跳过 %d 项，未识别 %d 个，读取失败 %d 个，耗时 %s\n\n",
+	out.Printf("统计范围: %s\n", root)
+	out.Printf("已统计 %d 个文件 / %s，跳过 %d 项，未识别 %d 个，读取失败 %d 个，耗时 %s\n\n",
 		res.Files, format.Bytes(res.Bytes), res.Skipped, res.Unsupported, res.Failed, res.Duration.Round(1e6))
 
 	stats := res.Languages
@@ -177,32 +178,34 @@ func renderText(w io.Writer, res *counter.Result, topN int) {
 		truncated = true
 	}
 
-	fmt.Fprintln(w, "排行榜")
-	fmt.Fprintf(w, "%-4s %-20s %8s %12s %12s %10s\n", "排名", "语言", "文件数", "代码行", "注释行", "空行")
-	fmt.Fprintln(w, strings.Repeat("-", 72))
+	out.Println("排行榜")
+	out.Printf("%-4s %-20s %8s %12s %12s %10s\n", "排名", "语言", "文件数", "代码行", "注释行", "空行")
+	out.Println(strings.Repeat("-", 72))
 	for i, stat := range stats {
-		fmt.Fprintf(w, "%-4d %-20s %8d %12s %12s %10s\n",
+		out.Printf("%-4d %-20s %8d %12s %12s %10s\n",
 			i+1, stat.Language, stat.Files,
 			format.Int(stat.Code), format.Int(stat.Comment), format.Int(stat.Blank))
 	}
 	if len(stats) == 0 {
-		fmt.Fprintln(w, "（没有可统计的代码文件）")
+		out.Println("（没有可统计的代码文件）")
 	}
 	if truncated {
-		fmt.Fprintf(w, "…… 其余 %d 种语言未显示，可使用 -top 0 查看全部\n", len(res.Languages)-len(stats))
+		out.Printf("…… 其余 %d 种语言未显示，可使用 -top 0 查看全部\n", len(res.Languages)-len(stats))
 	}
 
-	fmt.Fprintf(w, "\n%-4s %-20s %8d %12s %12s %10s\n", "", "合计", res.Total.Files,
+	out.Printf("\n%-4s %-20s %8d %12s %12s %10s\n", "", "合计", res.Total.Files,
 		format.Int(res.Total.Code), format.Int(res.Total.Comment), format.Int(res.Total.Blank))
 
 	if len(stats) > 0 {
-		fmt.Fprintln(w, "\n代码行数分布")
-		renderBars(w, stats)
+		out.Println("\n代码行数分布")
+		renderBars(out, stats)
 	}
+
+	return out.Err()
 }
 
 // renderBars 绘制横向条形图，长度按代码行数相对最大值等比缩放。
-func renderBars(w io.Writer, stats []counter.LanguageStat) {
+func renderBars(out *errWriter, stats []counter.LanguageStat) {
 	var maxCode int64
 	for _, stat := range stats {
 		if stat.Code > maxCode {
@@ -230,8 +233,36 @@ func renderBars(w io.Writer, stats []counter.LanguageStat) {
 			filled = 1
 		}
 		bar := strings.Repeat("█", filled) + strings.Repeat(" ", barWidth-filled)
-		fmt.Fprintf(w, "%-*s %s %s\n", nameWidth, truncate(stat.Language, nameWidth), bar, format.Int(stat.Code))
+		out.Printf("%-*s %s %s\n", nameWidth, truncate(stat.Language, nameWidth), bar, format.Int(stat.Code))
 	}
+}
+
+// errWriter 把连续的格式化输出合并为一个错误，
+// 便于在排行榜这类多行输出中只做一次错误检查。
+type errWriter struct {
+	w   io.Writer
+	err error
+}
+
+// Printf 按格式写入，出现错误后不再继续写入。
+func (e *errWriter) Printf(format string, args ...any) {
+	if e.err != nil {
+		return
+	}
+	_, e.err = fmt.Fprintf(e.w, format, args...)
+}
+
+// Println 写入一行，出现错误后不再继续写入。
+func (e *errWriter) Println(args ...any) {
+	if e.err != nil {
+		return
+	}
+	_, e.err = fmt.Fprintln(e.w, args...)
+}
+
+// Err 返回写入过程中出现的第一个错误。
+func (e *errWriter) Err() error {
+	return e.err
 }
 
 // truncate 按显示宽度截断字符串，超出部分以省略号结尾。

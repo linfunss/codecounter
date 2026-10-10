@@ -10,6 +10,7 @@ import (
 )
 
 // 条形图的布局常量，单位是与 DPI 无关的逻辑像素。
+// 实际绘制时会统一换算为物理像素，因此只使用 walk 的 *Pixels 系列方法。
 const (
 	chartPadding    = 12
 	chartRowHeight  = 30
@@ -52,7 +53,8 @@ func (c *barChart) SetOptions(showIcons bool, maxBars int) {
 // invalidate 在控件已创建时请求重绘。
 func (c *barChart) invalidate() {
 	if c.widget != nil {
-		c.widget.Invalidate()
+		// 重绘请求失败没有补救手段，忽略返回值
+		_ = c.widget.Invalidate()
 	}
 }
 
@@ -66,18 +68,20 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 		bounds = walk.Rectangle{Width: wb.Width, Height: wb.Height}
 	}
 
+	dpi := canvas.DPI()
+
 	background, err := walk.NewSolidColorBrush(walk.RGB(0xFF, 0xFF, 0xFF))
 	if err != nil {
 		return err
 	}
 	defer background.Dispose()
 
-	if err := canvas.FillRectangle(background, bounds); err != nil {
+	if err := canvas.FillRectanglePixels(background, walk.RectangleFrom96DPI(bounds, dpi)); err != nil {
 		return err
 	}
 
 	if len(c.rows) == 0 {
-		return canvas.DrawText("尚未统计，请选择要统计的目录或文件", c.font(),
+		return c.drawText(canvas, "尚未统计，请选择要统计的目录或文件",
 			walk.RGB(0x8A, 0x8A, 0x8A), bounds,
 			walk.TextCenter|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix)
 	}
@@ -109,7 +113,7 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 			Height: chartRowHeight,
 		}
 		text := fmt.Sprintf("…… 其余 %d 种语言未在图中显示，完整数据见上方排行榜", hidden)
-		if err := canvas.DrawText(text, c.font(), walk.RGB(0x8A, 0x8A, 0x8A), rect,
+		if err := c.drawText(canvas, text, walk.RGB(0x8A, 0x8A, 0x8A), rect,
 			walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix); err != nil {
 			return err
 		}
@@ -118,26 +122,37 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 	return nil
 }
 
+// drawText 按逻辑坐标绘制文本，内部换算为物理像素。
+func (c *barChart) drawText(canvas *walk.Canvas, text string, color walk.Color, bounds walk.Rectangle, format walk.DrawTextFormat) error {
+	return canvas.DrawTextPixels(text, c.font(), color, walk.RectangleFrom96DPI(bounds, canvas.DPI()), format)
+}
+
+// fillRounded 按逻辑坐标填充圆角矩形，内部换算为物理像素。
+func (c *barChart) fillRounded(canvas *walk.Canvas, brush walk.Brush, bounds walk.Rectangle, radius int) error {
+	dpi := canvas.DPI()
+	return canvas.FillRoundedRectanglePixels(brush,
+		walk.RectangleFrom96DPI(bounds, dpi),
+		walk.SizeFrom96DPI(walk.Size{Width: radius, Height: radius}, dpi))
+}
+
 // paintBadge 绘制自绘的语言徽章，用于没有内置图标的语言。
 func (c *barChart) paintBadge(canvas *walk.Canvas, bounds walk.Rectangle, mark badge) error {
 	brush, err := walk.NewSolidColorBrush(mark.color)
 	if err != nil {
 		return err
 	}
-	if err := canvas.FillRoundedRectangle(brush, bounds,
-		walk.Size{Width: chartRadius + 2, Height: chartRadius + 2}); err != nil {
-		brush.Dispose()
+	defer brush.Dispose()
+
+	if err := c.fillRounded(canvas, brush, bounds, chartRadius+2); err != nil {
 		return err
 	}
-	brush.Dispose()
 
-	return canvas.DrawText(mark.text, c.font(), contrastColor(mark.color), bounds,
+	return c.drawText(canvas, mark.text, contrastColor(mark.color), bounds,
 		walk.TextCenter|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix)
 }
 
 // paintRow 绘制单行：图标、语言名、条形与数值。
 func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, stat counter.LanguageStat, maxCode int64) error {
-	font := c.font()
 	mark := languageBadge(stat.Language)
 
 	y := chartPadding + index*chartRowHeight
@@ -168,7 +183,7 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 		Width:  layout.nameWidth,
 		Height: chartRowHeight,
 	}
-	if err := canvas.DrawText(stat.Language, font, walk.RGB(0x1F, 0x1F, 0x1F), nameRect,
+	if err := c.drawText(canvas, stat.Language, walk.RGB(0x1F, 0x1F, 0x1F), nameRect,
 		walk.TextVCenter|walk.TextSingleLine|walk.TextEndEllipsis|walk.TextNoPrefix); err != nil {
 		return err
 	}
@@ -185,8 +200,7 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 	}
 	defer track.Dispose()
 
-	if err := canvas.FillRoundedRectangle(track, trackRect,
-		walk.Size{Width: chartRadius, Height: chartRadius}); err != nil {
+	if err := c.fillRounded(canvas, track, trackRect, chartRadius); err != nil {
 		return err
 	}
 
@@ -198,8 +212,7 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 		}
 		defer value.Dispose()
 
-		if err := canvas.FillRoundedRectangle(value, valueRect,
-			walk.Size{Width: chartRadius, Height: chartRadius}); err != nil {
+		if err := c.fillRounded(canvas, value, valueRect, chartRadius); err != nil {
 			return err
 		}
 	}
@@ -210,7 +223,7 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 		Width:  layout.valueWidth,
 		Height: chartRowHeight,
 	}
-	return canvas.DrawText(format.Int(stat.Code), font, walk.RGB(0x1F, 0x1F, 0x1F), numberRect,
+	return c.drawText(canvas, format.Int(stat.Code), walk.RGB(0x1F, 0x1F, 0x1F), numberRect,
 		walk.TextRight|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix)
 }
 

@@ -241,13 +241,13 @@ func (p *prefsDialog) aboutPage() decl.TabPage {
 
 // loadValues 把当前配置写入各个控件。
 func (p *prefsDialog) loadValues() {
-	p.dirModeCombo.SetCurrentIndex(indexOfDirMode(p.current.DefaultDirMode))
-	p.fixedDirEdit.SetText(p.current.FixedDir)
+	_ = p.dirModeCombo.SetCurrentIndex(indexOfDirMode(p.current.DefaultDirMode))
+	_ = p.fixedDirEdit.SetText(p.current.FixedDir)
 	p.useDefaultsCheck.SetChecked(p.current.UseDefaultExcludes)
 	p.useGitIgnoreCheck.SetChecked(p.current.UseGitIgnore)
-	p.rulesEdit.SetText(strings.Join(p.current.CustomExcludes, "\r\n"))
+	_ = p.rulesEdit.SetText(strings.Join(p.current.CustomExcludes, "\r\n"))
 	p.showIconsCheck.SetChecked(p.current.ShowLanguageIcons)
-	p.maxBarsCombo.SetCurrentIndex(indexOfMaxBars(p.current.MaxBars))
+	_ = p.maxBarsCombo.SetCurrentIndex(indexOfMaxBars(p.current.MaxBars))
 
 	p.updateFixedDirEnabled()
 }
@@ -301,7 +301,7 @@ func (p *prefsDialog) chooseFixedDir() {
 	}
 
 	if ok, err := dlg.ShowBrowseFolder(p.dlg); err == nil && ok && dlg.FilePath != "" {
-		p.fixedDirEdit.SetText(dlg.FilePath)
+		_ = p.fixedDirEdit.SetText(dlg.FilePath)
 	}
 }
 

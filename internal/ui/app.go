@@ -238,7 +238,7 @@ func (a *App) beginScan(root string, files []string) bool {
 	}
 
 	a.runOnUI(func() {
-		a.pathEdit.SetText(label)
+		_ = a.pathEdit.SetText(label)
 		a.setStatus("正在统计…")
 	})
 	return true
@@ -445,7 +445,8 @@ func (a *App) setStatus(text string) {
 	if a.status == nil {
 		return
 	}
-	a.status.SetText(text)
+	// 状态栏更新失败没有补救手段，忽略返回值
+	_ = a.status.SetText(text)
 }
 
 // reportError 在主线程弹出错误提示。

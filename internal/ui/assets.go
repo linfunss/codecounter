@@ -17,6 +17,10 @@ import (
 //go:embed assets/icons/*.png
 var iconAssets embed.FS
 
+// iconDPI 是内嵌图标位图的基准 DPI。
+// 图标始终按目标物理像素尺寸绘制，这里只影响位图自身的 DPI 元数据。
+const iconDPI = 96
+
 // appIconPNG 是应用图标的 PNG 版本，用于设置窗口与任务栏图标。
 // 可执行文件本身的图标由 winres/app.ico 通过资源文件嵌入。
 //
@@ -79,7 +83,7 @@ func appIcon() *walk.Icon {
 		if err != nil {
 			return
 		}
-		icon, err := walk.NewIconFromImage(img)
+		icon, err := walk.NewIconFromImageForDPI(img, iconDPI)
 		if err != nil {
 			return
 		}
@@ -114,7 +118,7 @@ func languageLogo(language string) *walk.Bitmap {
 		return nil
 	}
 
-	bmp, err := walk.NewBitmapFromImage(img)
+	bmp, err := walk.NewBitmapFromImageForDPI(img, iconDPI)
 	if err != nil {
 		return nil
 	}
