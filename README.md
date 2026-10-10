@@ -101,6 +101,20 @@ codecounter --version
 
 不带 `--cli` / `--json` 参数时默认启动图形界面。
 
+> **PowerShell 用户注意**：发布版使用 GUI 子系统（无控制台窗口），
+> PowerShell 不会等待这类进程，直接调用会看不到输出。请改用下面任一方式：
+>
+> ```powershell
+> cmd /c "codecounter.exe --cli --path ."
+> ```
+>
+> ```powershell
+> Start-Process codecounter.exe -ArgumentList "--cli","--path","." `
+>   -NoNewWindow -Wait -RedirectStandardOutput result.txt
+> ```
+>
+> 在 cmd、bash 或 CI 脚本中直接调用即可正常输出。
+
 > 命令行模式下的排除规则参数只作用于该次运行；图形界面使用配置文件中的设置。
 > 图形界面下仍可用 `--path` 指定启动时统计的目录。
 
