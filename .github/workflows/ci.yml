@@ -86,6 +86,25 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: go build -ldflags "-H=windowsgui" -o codecounter-${{ matrix.goarch }}.exe ./cmd/codecounter
 
+  goreleaser-check:
+    name: 发布配置校验
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v7
+
+      - name: 安装 Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: 校验 GoReleaser 配置
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: check
+
   secret-scan:
     name: 敏感信息扫描
     runs-on: ubuntu-latest
