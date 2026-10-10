@@ -118,6 +118,23 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 	return nil
 }
 
+// paintBadge 绘制自绘的语言徽章，用于没有内置图标的语言。
+func (c *barChart) paintBadge(canvas *walk.Canvas, bounds walk.Rectangle, mark badge) error {
+	brush, err := walk.NewSolidColorBrush(mark.color)
+	if err != nil {
+		return err
+	}
+	if err := canvas.FillRoundedRectangle(brush, bounds,
+		walk.Size{Width: chartRadius + 2, Height: chartRadius + 2}); err != nil {
+		brush.Dispose()
+		return err
+	}
+	brush.Dispose()
+
+	return canvas.DrawText(mark.text, c.font(), contrastColor(mark.color), bounds,
+		walk.TextCenter|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix)
+}
+
 // paintRow 绘制单行：图标、语言名、条形与数值。
 func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, stat counter.LanguageStat, maxCode int64) error {
 	font := c.font()
@@ -134,19 +151,13 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 			Height: layout.badgeSize,
 		}
 
-		badgeBrush, err := walk.NewSolidColorBrush(mark.color)
-		if err != nil {
-			return err
-		}
-		if err := canvas.FillRoundedRectangle(badgeBrush, badgeRect,
-			walk.Size{Width: chartRadius + 2, Height: chartRadius + 2}); err != nil {
-			badgeBrush.Dispose()
-			return err
-		}
-		badgeBrush.Dispose()
-
-		if err := canvas.DrawText(mark.text, font, contrastColor(mark.color), badgeRect,
-			walk.TextCenter|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix); err != nil {
+		if logo := languageLogo(stat.Language); logo != nil {
+			// 按目标像素尺寸绘制，避免 GDI 缩放导致图标模糊
+			pixelRect := walk.RectangleFrom96DPI(badgeRect, canvas.DPI())
+			if err := canvas.DrawImageStretchedPixels(logo, pixelRect); err != nil {
+				return err
+			}
+		} else if err := c.paintBadge(canvas, badgeRect, mark); err != nil {
 			return err
 		}
 	}

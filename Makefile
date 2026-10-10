@@ -8,7 +8,7 @@ BINARY  := codecounter.exe
 VERSION ?= 0.1.0-dev
 LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: all build build-gui test vet fmt tidy clean run winres
+.PHONY: all build build-gui test vet fmt tidy clean run winres icons
 
 all: fmt vet test build
 
@@ -25,6 +25,10 @@ build-gui:
 ##       已纳入版本管理，只有修改清单后才需要重新执行。
 winres:
 	go generate ./cmd/codecounter
+
+## icons: 重新生成语言图标（需要联网）
+icons:
+	cd tools/genicons && go run . -out ../../internal/ui/assets/icons
 
 ## test: 运行全部单元测试
 test:

@@ -117,7 +117,7 @@ func (a *App) create() error {
 			decl.GroupBox{
 				Title:         "排行榜",
 				Layout:        decl.VBox{},
-				MinSize:       decl.Size{Height: 220},
+				MinSize:       decl.Size{Height: 180},
 				StretchFactor: 3,
 				Children: []decl.Widget{
 					decl.TableView{
@@ -141,8 +141,8 @@ func (a *App) create() error {
 			decl.GroupBox{
 				Title:   "代码行数分布",
 				Layout:  decl.VBox{},
-				MinSize: decl.Size{Height: 272},
-				MaxSize: decl.Size{Height: 272},
+				MinSize: decl.Size{Height: 330},
+				MaxSize: decl.Size{Height: 330},
 				Children: []decl.Widget{
 					decl.CustomWidget{
 						AssignTo:            &a.chart.widget,

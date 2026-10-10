@@ -1,0 +1,58 @@
+CodeCounter 第三方资源说明
+==========================
+
+编程语言图标
+------------
+
+`internal/ui/assets/icons` 下的图标取自 simple-icons 项目：
+
+- 项目地址：https://github.com/simple-icons/simple-icons
+- 许可证：CC0-1.0（https://creativecommons.org/publicdomain/zero/1.0/）
+
+这些图标由 `tools/genicons` 从 Iconify API 拉取 SVG 并光栅化为 PNG 后提交到
+仓库。需要重新生成时执行：
+
+    cd tools/genicons
+    go run . -out ../../internal/ui/assets/icons
+
+图标清单（语言 -> 文件名）：
+
+    C            c.png            C#          csharp.png
+    C++          cplusplus.png    CMake       cmake.png
+    CSS          css.png          Dart        dart.png
+    Dockerfile   dockerfile.png   Go          go.png
+    Gradle       gradle.png       HTML        html.png
+    Java         java.png         JavaScript  javascript.png
+    JSON         json.png         Kotlin      kotlin.png
+    Lua          lua.png          Markdown    markdown.png
+    PHP          php.png          Perl        perl.png
+    PowerShell   powershell.png   Python      python.png
+    R            r.png            Ruby        ruby.png
+    Rust         rust.png         SCSS        scss.png
+    Scala        scala.png        Shell       shell.png
+    Svelte       svelte.png       Swift       swift.png
+    Terraform    terraform.png    TypeScript  typescript.png
+    Vue          vue.png          YAML        yaml.png
+
+图标所代表的品牌名称与商标归各自所有者所有，本项目仅在标识对应编程语言时
+使用这些图形，不代表任何形式的背书或关联。
+
+第三方库
+--------
+
+- github.com/boyter/scc          MIT          语言识别与代码行统计
+- github.com/lxn/walk            BSD-3-Clause Windows 原生控件封装
+- github.com/lxn/win             BSD-3-Clause Win32 API 绑定
+- github.com/sabhiram/go-gitignore  MIT        .gitignore 规则解析
+
+以上库均通过 Go 模块引入，其完整许可证文本可在各自的模块目录中查看。
+
+构建期工具（不参与运行时）
+--------------------------
+
+- github.com/akavel/rsrc         生成 Windows 资源文件（应用清单）
+- github.com/srwiley/oksvg       构建图标时解析 SVG
+- github.com/srwiley/rasterx     构建图标时光栅化
+
+前两者仅用于生成随仓库提交的产物，`srwiley` 相关库位于独立子模块
+`tools/genicons`，均不会进入最终可执行文件。
