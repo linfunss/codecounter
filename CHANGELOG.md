@@ -7,6 +7,10 @@
 
 ## [未发布]
 
+暂无。
+
+## [0.1.0] - 2026-10-10
+
 ### 新增
 
 - 初始化项目仓库结构、许可证与工程配置
@@ -39,4 +43,5 @@
 
 - 界面依赖 `lxn/walk`，因此本项目仅支持 Windows
 
-[未发布]: https://github.com/linfunss/codecounter/commits/dev
+[未发布]: https://github.com/linfunss/codecounter/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/linfunss/codecounter/releases/tag/v0.1.0
