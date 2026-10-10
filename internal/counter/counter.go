@@ -5,6 +5,7 @@
 package counter
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -139,7 +140,7 @@ func CountDir(ctx context.Context, root string, opts Options) (*Result, error) {
 	}
 
 	res := c.result(absRoot, time.Since(start))
-	res.Skipped = stats.Skipped
+	res.Skipped += stats.Skipped
 	return res, nil
 }
 
@@ -164,7 +165,7 @@ func CountFiles(ctx context.Context, paths []string, opts Options) (*Result, err
 	c.stop()
 
 	res := c.result("", time.Since(start))
-	res.Skipped = stats.Skipped
+	res.Skipped += stats.Skipped
 	return res, nil
 }
 
@@ -182,6 +183,19 @@ func SortStats(list []LanguageStat) {
 	})
 }
 
+// binarySampleSize 是判断文件是否为二进制时采样的字节数。
+const binarySampleSize = 8000
+
+// isBinary 通过探测 NUL 字节判断内容是否为二进制，
+// 与版本控制系统常用的启发式一致。
+func isBinary(content []byte) bool {
+	sample := content
+	if len(sample) > binarySampleSize {
+		sample = sample[:binarySampleSize]
+	}
+	return bytes.IndexByte(sample, 0) >= 0
+}
+
 // collector 汇总并发统计过程中的中间结果。
 type collector struct {
 	ctx         context.Context
@@ -197,6 +211,7 @@ type collector struct {
 	bytes       int64
 	failed      int
 	unsupported int
+	binary      int
 }
 
 // newCollector 依据选项构建统计器，缺省值在此处补齐。
@@ -267,6 +282,12 @@ func (c *collector) handle(e scan.Entry) {
 		return
 	}
 
+	// 图片、可执行文件等二进制内容不属于代码，直接跳过而不计入「未识别」
+	if isBinary(content) {
+		c.markBinary()
+		return
+	}
+
 	lang := DetectLanguage(filepath.Base(e.Path), content)
 	if lang == "" {
 		c.markUnsupported()
@@ -308,7 +329,14 @@ func (c *collector) handle(e scan.Entry) {
 	c.bytes += job.Bytes
 }
 
-// markUnsupported 记录一个内容为二进制或语言无法识别的文件。
+// markBinary 记录一个被跳过的二进制文件。
+func (c *collector) markBinary() {
+	c.mu.Lock()
+	c.binary++
+	c.mu.Unlock()
+}
+
+// markUnsupported 记录一个语言无法识别的文本文件。
 func (c *collector) markUnsupported() {
 	c.mu.Lock()
 	c.unsupported++
@@ -331,6 +359,7 @@ func (c *collector) result(root string, elapsed time.Duration) *Result {
 		Root:        root,
 		Duration:    elapsed,
 		Files:       c.files,
+		Skipped:     c.binary,
 		Unsupported: c.unsupported,
 		Failed:      c.failed,
 		Bytes:       c.bytes,

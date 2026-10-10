@@ -5,8 +5,8 @@
 //
 // 默认启动 Windows 原生图形界面；使用 --cli 或 --json 时改为命令行输出，
 // 便于在脚本或 CI 中直接使用。
-//go:generate go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest ../../winres/app.manifest -o rsrc_windows_amd64.syso
-//go:generate go run github.com/akavel/rsrc@v0.10.2 -arch arm64 -manifest ../../winres/app.manifest -o rsrc_windows_arm64.syso
+//go:generate go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest ../../winres/app.manifest -ico ../../winres/app.ico -o rsrc_windows_amd64.syso
+//go:generate go run github.com/akavel/rsrc@v0.10.2 -arch arm64 -manifest ../../winres/app.manifest -ico ../../winres/app.ico -o rsrc_windows_arm64.syso
 
 package main
 

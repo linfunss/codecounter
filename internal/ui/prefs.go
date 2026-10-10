@@ -79,7 +79,7 @@ func (p *prefsDialog) create() error {
 		configPath = "（无法确定配置路径）"
 	}
 
-	return decl.Dialog{
+	if err := (decl.Dialog{
 		AssignTo: &p.dlg,
 		Title:    "CodeCounter 设置",
 		MinSize:  decl.Size{Width: 660, Height: 540},
@@ -120,7 +120,14 @@ func (p *prefsDialog) create() error {
 		},
 		DefaultButton: &p.okButton,
 		CancelButton:  &p.cancelButton,
-	}.Create(p.owner)
+	}).Create(p.owner); err != nil {
+		return err
+	}
+
+	if icon := appIcon(); icon != nil {
+		_ = p.dlg.SetIcon(icon)
+	}
+	return nil
 }
 
 // generalPage 构建「通用」标签页。

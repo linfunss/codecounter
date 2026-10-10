@@ -88,7 +88,7 @@ func Run(opts Options) error {
 
 // create 构建主窗口及其控件。
 func (a *App) create() error {
-	return decl.MainWindow{
+	err := decl.MainWindow{
 		AssignTo: &a.window,
 		Title:    fmt.Sprintf("CodeCounter %s", a.opts.Version),
 		MinSize:  decl.Size{Width: 880, Height: 560},
@@ -158,6 +158,14 @@ func (a *App) create() error {
 			{AssignTo: &a.status, Text: "准备就绪"},
 		},
 	}.Create()
+	if err != nil {
+		return err
+	}
+
+	if icon := appIcon(); icon != nil {
+		_ = a.window.SetIcon(icon)
+	}
+	return nil
 }
 
 // initialDir 返回启动时应统计的目录。

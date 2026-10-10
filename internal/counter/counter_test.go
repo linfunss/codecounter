@@ -152,3 +152,32 @@ func TestSortStats(t *testing.T) {
 		}
 	}
 }
+
+// TestCountDirSkipsBinary 验证二进制文件被计入跳过而不是未识别。
+func TestCountDirSkipsBinary(t *testing.T) {
+	dir := t.TempDir()
+
+	// 含 NUL 字节的内容会被判定为二进制
+	binaryData := append([]byte{0x89, 'P', 'N', 'G', 0x00, 0x1A}, make([]byte, 128)...)
+	if err := os.WriteFile(filepath.Join(dir, "logo.png"), binaryData, 0o644); err != nil {
+		t.Fatalf("写入测试文件失败: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatalf("写入测试文件失败: %v", err)
+	}
+
+	res, err := CountDir(context.Background(), dir, Options{})
+	if err != nil {
+		t.Fatalf("统计失败: %v", err)
+	}
+
+	if res.Files != 1 {
+		t.Errorf("统计文件数 = %d, 期望 1", res.Files)
+	}
+	if res.Unsupported != 0 {
+		t.Errorf("二进制文件不应计入未识别，实际 %d", res.Unsupported)
+	}
+	if res.Skipped != 1 {
+		t.Errorf("跳过数 = %d, 期望 1", res.Skipped)
+	}
+}

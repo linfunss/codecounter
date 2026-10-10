@@ -17,6 +17,12 @@ import (
 //go:embed assets/icons/*.png
 var iconAssets embed.FS
 
+// appIconPNG 是应用图标的 PNG 版本，用于设置窗口与任务栏图标。
+// 可执行文件本身的图标由 winres/app.ico 通过资源文件嵌入。
+//
+//go:embed assets/icon.png
+var appIconPNG []byte
+
 // languageLogoFiles 把 scc 输出的语言名映射到内置图标文件名。
 // 未收录的语言会在界面上回退为自绘的品牌色徽章。
 var languageLogoFiles = map[string]string{
@@ -60,6 +66,27 @@ var (
 	logoMu    sync.Mutex
 	logoCache = map[string]*walk.Bitmap{}
 )
+
+var (
+	appIconOnce sync.Once
+	appIconVal  *walk.Icon
+)
+
+// appIcon 返回应用图标，加载失败时返回 nil。
+func appIcon() *walk.Icon {
+	appIconOnce.Do(func() {
+		img, err := png.Decode(bytes.NewReader(appIconPNG))
+		if err != nil {
+			return
+		}
+		icon, err := walk.NewIconFromImage(img)
+		if err != nil {
+			return
+		}
+		appIconVal = icon
+	})
+	return appIconVal
+}
 
 // languageLogo 返回语言对应的图标位图。
 //
