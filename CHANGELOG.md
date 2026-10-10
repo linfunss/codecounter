@@ -7,9 +7,41 @@
 
 ## [未发布]
 
+暂无。
+
+## [0.1.0] - 2026-10-10
+
 ### 新增
 
 - 初始化项目仓库结构、许可证与工程配置
 - 制定分支策略、提交规范与隐私自查清单
+- 计数引擎：基于 scc 的语言识别，分别统计代码、注释与空行
+- 排除规则：内置冗余目录与文件名单，支持自定义 glob、`!` 取反与 `.gitignore`
+- 目录遍历：支持单文件大小上限与上下文取消
+- 命令行模式：排行榜与横向条形图输出，支持 JSON 导出
+- Windows 原生图形界面：工具栏、统计范围栏、排行榜表格、条形图与状态栏
+- 语言图标：内置 32 种语言的真实 logo（取自 simple-icons），
+  未收录语言回退为按品牌色绘制的首字母徽章
+- 目录选择、文件多选与统计结果导出
+- Windows 应用清单：启用通用控件 6.0 与高 DPI 感知
+- 应用图标：内嵌到可执行文件与窗口标题栏
+- 二进制文件（图片、可执行文件等）在统计时直接跳过，不再计入「未识别」
+- 用户配置：保存到 `%APPDATA%\CodeCounter\config.json`，支持默认目录策略、
+  排除规则、语言图标与条形图数量上限
+- 设置对话框：通用 / 排除规则 / 显示 / 关于 四个标签页，支持恢复默认
+  与在资源管理器中打开配置目录
+- 图形界面的排除规则改由配置文件决定，命令行参数只影响本次命令行运行
 
-[未发布]: https://github.com/linfunss/codecounter/commits/dev
+### 工程
+
+- CI 工作流：格式检查、`go vet`、单元测试、golangci-lint、构建矩阵与 gitleaks 敏感信息扫描
+- 发布工作流：推送 `v*` 标签时调用 GoReleaser 构建并发布 Windows amd64 / arm64 版本
+- 新增 dependabot 配置、议题模板与 PR 模板
+- 新增 `docs/发布流程.md` 说明发布与回滚步骤
+
+### 说明
+
+- 界面依赖 `lxn/walk`，因此本项目仅支持 Windows
+
+[未发布]: https://github.com/linfunss/codecounter/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/linfunss/codecounter/releases/tag/v0.1.0

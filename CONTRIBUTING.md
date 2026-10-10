@@ -114,6 +114,19 @@ go test ./...
 golangci-lint run
 ```
 
-## 六、行为准则
+## 六、Windows 资源文件
+
+`cmd/codecounter` 下的 `rsrc_windows_amd64.syso` 与 `rsrc_windows_arm64.syso`
+由 `winres/app.manifest` 生成，用于嵌入应用清单（通用控件 6.0、高 DPI 感知、
+兼容性声明）。
+
+- 缺少该清单时 Windows 会退回通用控件 v5，界面变成旧式外观，
+  并且部分控件 API 调用会直接失败
+- 文件名中的 `windows_amd64` / `windows_arm64` 是 Go 的构建约束后缀，
+  链接器会按目标架构自动选择
+- 修改 `winres/app.manifest` 后必须执行 `go generate ./cmd/codecounter`
+  重新生成，并把新的 `.syso` 一并提交
+
+## 七、行为准则
 
 参与本项目即表示同意遵守 [贡献者行为准则](CODE_OF_CONDUCT.md)。
