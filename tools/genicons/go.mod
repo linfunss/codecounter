@@ -1,7 +1,7 @@
 // 独立的图标生成工具模块，不参与主模块构建。
 module github.com/linfunss/codecounter/tools/genicons
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c
@@ -9,7 +9,7 @@ require (
 )
 
 require (
-	golang.org/x/image v0.0.0-20211028202545-6944b10bf410 // indirect
+	golang.org/x/image v0.41.0 // indirect
 	golang.org/x/net v0.0.0-20211118161319-6a13c67c3ce4 // indirect
-	golang.org/x/text v0.3.6 // indirect
+	golang.org/x/text v0.37.0 // indirect
 )
