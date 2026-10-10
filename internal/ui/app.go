@@ -15,19 +15,17 @@ import (
 	"github.com/lxn/walk"
 	decl "github.com/lxn/walk/declarative"
 
+	"github.com/linfunss/codecounter/internal/config"
 	"github.com/linfunss/codecounter/internal/counter"
 	"github.com/linfunss/codecounter/internal/format"
-	"github.com/linfunss/codecounter/internal/ignore"
 )
 
 // Options 控制主窗口的启动行为。
 type Options struct {
 	// Version 显示在窗口标题上。
 	Version string
-	// InitialDir 是启动后立即统计的目录，为空时使用当前工作目录。
+	// InitialDir 非空时覆盖配置里的默认统计目录。
 	InitialDir string
-	// Matcher 为 nil 时使用内置默认排除名单。
-	Matcher *ignore.Matcher
 	// Workers 为 0 时使用 CPU 核心数。
 	Workers int
 }
@@ -47,6 +45,7 @@ type App struct {
 	cancel context.CancelFunc
 
 	mu       sync.Mutex
+	cfg      config.Config
 	root     string
 	files    []string
 	scanning bool
@@ -55,19 +54,15 @@ type App struct {
 
 // Run 创建主窗口并进入消息循环，直到用户关闭窗口。
 func Run(opts Options) error {
-	if opts.Matcher == nil {
-		matcher, err := ignore.New(ignore.Options{UseDefaults: true})
-		if err != nil {
-			return err
-		}
-		opts.Matcher = matcher
-	}
+	cfg, loadErr := config.Load()
 
 	app := &App{
 		opts:  opts,
+		cfg:   cfg,
 		model: &leaderboardModel{},
 		chart: newBarChart(),
 	}
+	app.chart.SetOptions(cfg.ShowLanguageIcons, cfg.MaxBars)
 	app.ctx, app.cancel = context.WithCancel(context.Background())
 
 	if err := app.create(); err != nil {
@@ -75,8 +70,13 @@ func Run(opts Options) error {
 	}
 
 	app.window.Starting().Attach(func() {
-		// 窗口显示后立即统计启动目录，避免界面因等待遍历而卡住
-		go app.scanDir(opts.InitialDir)
+		if loadErr != nil {
+			walk.MsgBox(app.window, "配置读取失败",
+				loadErr.Error()+"\n\n已改用默认设置继续运行。", walk.MsgBoxIconWarning)
+		}
+		// 窗口显示后立即统计，避免界面因等待遍历而卡住
+
+		go app.scanDir(app.initialDir())
 	})
 	app.window.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
 		app.cancel()
@@ -102,6 +102,7 @@ func (a *App) create() error {
 				decl.Action{Text: "选择文件", OnTriggered: func() { a.chooseFiles() }},
 				decl.Action{Text: "重新统计", OnTriggered: func() { a.rescan() }},
 				decl.Action{Text: "导出 JSON", OnTriggered: func() { a.exportJSON() }},
+				decl.Action{Text: "设置", OnTriggered: func() { a.openPrefs() }},
 			},
 		},
 		Children: []decl.Widget{
@@ -159,22 +160,38 @@ func (a *App) create() error {
 	}.Create()
 }
 
+// initialDir 返回启动时应统计的目录。
+func (a *App) initialDir() string {
+	if a.opts.InitialDir != "" {
+		return a.opts.InitialDir
+	}
+	return a.currentConfig().InitialDir()
+}
+
 // scanDir 在后台统计目录，并在完成后更新界面。
 func (a *App) scanDir(root string) {
 	if root == "" {
-		wd, err := os.Getwd()
-		if err != nil {
-			a.reportError("获取当前工作目录失败", err)
-			return
-		}
-		root = wd
+		root = a.currentConfig().InitialDir()
+	}
+	if root == "" {
+		a.reportError("无法确定统计目录", fmt.Errorf("当前工作目录不可用"))
+		return
 	}
 
 	if !a.beginScan(root, nil) {
 		return
 	}
 
-	res, err := counter.CountDir(a.ctx, root, a.counterOptions())
+	opts, err := a.counterOptions(root)
+	if err != nil {
+		a.finishScan(nil, err)
+		return
+	}
+
+	res, err := counter.CountDir(a.ctx, root, opts)
+	if err == nil {
+		a.rememberDir(root)
+	}
 	a.finishScan(res, err)
 }
 
@@ -184,7 +201,13 @@ func (a *App) scanFiles(files []string) {
 		return
 	}
 
-	res, err := counter.CountFiles(a.ctx, files, a.counterOptions())
+	opts, err := a.counterOptions("")
+	if err != nil {
+		a.finishScan(nil, err)
+		return
+	}
+
+	res, err := counter.CountFiles(a.ctx, files, opts)
 	a.finishScan(res, err)
 }
 
@@ -193,7 +216,7 @@ func (a *App) beginScan(root string, files []string) bool {
 	a.mu.Lock()
 	if a.scanning {
 		a.mu.Unlock()
-		a.setStatus("正在统计，请稍候…")
+		a.runOnUI(func() { a.setStatus("正在统计，请稍候…") })
 		return false
 	}
 	a.scanning = true
@@ -206,7 +229,7 @@ func (a *App) beginScan(root string, files []string) bool {
 		label = fmt.Sprintf("已选择 %d 个文件", len(files))
 	}
 
-	a.window.Synchronize(func() {
+	a.runOnUI(func() {
 		a.pathEdit.SetText(label)
 		a.setStatus("正在统计…")
 	})
@@ -227,14 +250,14 @@ func (a *App) finishScan(res *counter.Result, err error) {
 		return
 	}
 
-	a.window.Synchronize(func() {
+	a.runOnUI(func() {
 		a.model.SetRows(res.Languages)
 		a.chart.SetRows(res.Languages)
 
 		summary := fmt.Sprintf("已统计 %d 个文件 · 代码 %s 行 · 注释 %s 行 · 跳过 %d 项 · 耗时 %s",
 			res.Files, format.Int(res.Total.Code), format.Int(res.Total.Comment),
 			res.Skipped, res.Duration.Round(time.Millisecond))
-		a.status.SetText(summary)
+		a.setStatus(summary)
 	})
 }
 
@@ -291,6 +314,30 @@ func (a *App) rescan() {
 	go a.scanDir(root)
 }
 
+// openPrefs 打开设置对话框并把结果应用到当前会话。
+func (a *App) openPrefs() {
+	updated, accepted, err := showPrefs(a.window, a.opts.Version, a.currentConfig())
+	if err != nil {
+		a.reportError("打开设置失败", err)
+		return
+	}
+	if !accepted {
+		return
+	}
+
+	if err := updated.Save(); err != nil {
+		a.reportError("保存设置失败", err)
+		return
+	}
+
+	a.mu.Lock()
+	a.cfg = updated
+	a.mu.Unlock()
+
+	a.chart.SetOptions(updated.ShowLanguageIcons, updated.MaxBars)
+	a.rescan()
+}
+
 // exportJSON 把最近一次统计结果导出为 JSON 文件。
 func (a *App) exportJSON() {
 	a.mu.Lock()
@@ -330,23 +377,59 @@ func (a *App) exportJSON() {
 	walk.MsgBox(a.window, "导出完成", "统计结果已导出到：\n"+dlg.FilePath, walk.MsgBoxIconInformation)
 }
 
-// counterOptions 返回统计参数。
-func (a *App) counterOptions() counter.Options {
-	return counter.Options{Matcher: a.opts.Matcher, Workers: a.opts.Workers}
+// counterOptions 依据当前配置构建统计参数。
+func (a *App) counterOptions(root string) (counter.Options, error) {
+	matcher, err := a.currentConfig().NewMatcher(root)
+	if err != nil {
+		return counter.Options{}, err
+	}
+	return counter.Options{Matcher: matcher, Workers: a.opts.Workers}, nil
+}
+
+// rememberDir 记录最近统计的目录，供「上一次使用的目录」策略使用。
+func (a *App) rememberDir(root string) {
+	a.mu.Lock()
+	if a.cfg.LastDir == root {
+		a.mu.Unlock()
+		return
+	}
+	a.cfg.LastDir = root
+	snapshot := a.cfg
+	a.mu.Unlock()
+
+	if err := snapshot.Save(); err != nil {
+		a.runOnUI(func() { a.setStatus("配置保存失败: " + err.Error()) })
+	}
+}
+
+// currentConfig 返回当前配置的副本。
+func (a *App) currentConfig() config.Config {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cfg
 }
 
 // currentRoot 返回当前统计目录，用于文件对话框的初始位置。
 func (a *App) currentRoot() string {
 	a.mu.Lock()
-	defer a.mu.Unlock()
+	root := a.root
+	a.mu.Unlock()
 
-	if a.root != "" {
-		return a.root
+	if root != "" {
+		return root
 	}
 	if wd, err := os.Getwd(); err == nil {
 		return wd
 	}
 	return ""
+}
+
+// runOnUI 把函数投递到界面线程执行。
+func (a *App) runOnUI(f func()) {
+	if a.window == nil {
+		return
+	}
+	a.window.Synchronize(f)
 }
 
 // setStatus 更新状态栏文本。
@@ -359,8 +442,8 @@ func (a *App) setStatus(text string) {
 
 // reportError 在主线程弹出错误提示。
 func (a *App) reportError(title string, err error) {
-	a.setStatus(title)
-	a.window.Synchronize(func() {
+	a.runOnUI(func() {
+		a.setStatus(title)
 		walk.MsgBox(a.window, title, err.Error(), walk.MsgBoxIconError)
 	})
 }

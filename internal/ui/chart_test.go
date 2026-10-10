@@ -63,7 +63,7 @@ func TestVisibleRows(t *testing.T) {
 func TestNewChartLayoutFitsBounds(t *testing.T) {
 	for _, width := range []int{700, 880, 1040, 1600} {
 		bounds := walk.Rectangle{Width: width, Height: 400}
-		layout := newChartLayout(bounds)
+		layout := newChartLayout(bounds, true)
 
 		if layout.barWidth < 20 {
 			t.Errorf("宽度 %d 时条形宽度过小: %d", width, layout.barWidth)

@@ -24,16 +24,33 @@ const (
 type barChart struct {
 	widget *walk.CustomWidget
 	rows   []counter.LanguageStat
+
+	// showIcons 控制是否绘制语言图标。
+	showIcons bool
+	// maxBars 是图表最多显示的语言数量，0 表示不限。
+	maxBars int
 }
 
 // newBarChart 创建一个尚未绑定控件的条形图。
 func newBarChart() *barChart {
-	return &barChart{}
+	return &barChart{showIcons: true}
 }
 
 // SetRows 更新数据并触发重绘。
 func (c *barChart) SetRows(rows []counter.LanguageStat) {
 	c.rows = rows
+	c.invalidate()
+}
+
+// SetOptions 更新显示选项并触发重绘。
+func (c *barChart) SetOptions(showIcons bool, maxBars int) {
+	c.showIcons = showIcons
+	c.maxBars = maxBars
+	c.invalidate()
+}
+
+// invalidate 在控件已创建时请求重绘。
+func (c *barChart) invalidate() {
 	if c.widget != nil {
 		c.widget.Invalidate()
 	}
@@ -65,12 +82,6 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 			walk.TextCenter|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix)
 	}
 
-	track, err := walk.NewSolidColorBrush(walk.RGB(0xEC, 0xEC, 0xEC))
-	if err != nil {
-		return err
-	}
-	defer track.Dispose()
-
 	rows, hidden := c.visibleRows(bounds)
 	if len(rows) == 0 {
 		return nil
@@ -83,7 +94,7 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 		}
 	}
 
-	layout := newChartLayout(bounds)
+	layout := newChartLayout(bounds, c.showIcons)
 	for i, r := range rows {
 		if err := c.paintRow(canvas, layout, i, r, maxCode); err != nil {
 			return err
@@ -113,26 +124,35 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 	mark := languageBadge(stat.Language)
 
 	y := chartPadding + index*chartRowHeight
-	centerY := y + (chartRowHeight-chartBadgeSize)/2
 
-	badgeRect := walk.Rectangle{X: chartPadding, Y: centerY, Width: chartBadgeSize, Height: chartBadgeSize}
-	badgeBrush, err := walk.NewSolidColorBrush(mark.color)
-	if err != nil {
-		return err
-	}
-	if err := canvas.FillRoundedRectangle(badgeBrush, badgeRect, walk.Size{Width: chartRadius + 2, Height: chartRadius + 2}); err != nil {
+	if layout.badgeSize > 0 {
+		centerY := y + (chartRowHeight-layout.badgeSize)/2
+		badgeRect := walk.Rectangle{
+			X:      chartPadding,
+			Y:      centerY,
+			Width:  layout.badgeSize,
+			Height: layout.badgeSize,
+		}
+
+		badgeBrush, err := walk.NewSolidColorBrush(mark.color)
+		if err != nil {
+			return err
+		}
+		if err := canvas.FillRoundedRectangle(badgeBrush, badgeRect,
+			walk.Size{Width: chartRadius + 2, Height: chartRadius + 2}); err != nil {
+			badgeBrush.Dispose()
+			return err
+		}
 		badgeBrush.Dispose()
-		return err
-	}
-	badgeBrush.Dispose()
 
-	if err := canvas.DrawText(mark.text, font, contrastColor(mark.color), badgeRect,
-		walk.TextCenter|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix); err != nil {
-		return err
+		if err := canvas.DrawText(mark.text, font, contrastColor(mark.color), badgeRect,
+			walk.TextCenter|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix); err != nil {
+			return err
+		}
 	}
 
 	nameRect := walk.Rectangle{
-		X:      badgeRect.X + chartBadgeSize + chartGap,
+		X:      layout.nameX,
 		Y:      y,
 		Width:  layout.nameWidth,
 		Height: chartRowHeight,
@@ -154,7 +174,8 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 	}
 	defer track.Dispose()
 
-	if err := canvas.FillRoundedRectangle(track, trackRect, walk.Size{Width: chartRadius, Height: chartRadius}); err != nil {
+	if err := canvas.FillRoundedRectangle(track, trackRect,
+		walk.Size{Width: chartRadius, Height: chartRadius}); err != nil {
 		return err
 	}
 
@@ -166,7 +187,8 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 		}
 		defer value.Dispose()
 
-		if err := canvas.FillRoundedRectangle(value, valueRect, walk.Size{Width: chartRadius, Height: chartRadius}); err != nil {
+		if err := canvas.FillRoundedRectangle(value, valueRect,
+			walk.Size{Width: chartRadius, Height: chartRadius}); err != nil {
 			return err
 		}
 	}
@@ -181,24 +203,27 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 		walk.TextRight|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix)
 }
 
-// visibleRows 返回当前尺寸下能显示的行与未显示的行数。
+// visibleRows 返回当前显示选项与尺寸下能显示的行，以及未显示的行数。
 func (c *barChart) visibleRows(bounds walk.Rectangle) ([]counter.LanguageStat, int) {
+	rows := c.rows
+	if c.maxBars > 0 && len(rows) > c.maxBars {
+		rows = rows[:c.maxBars]
+	}
+
 	maxRows := (bounds.Height - chartPadding*2) / chartRowHeight
 	if maxRows < 1 {
 		maxRows = 1
 	}
 
-	if len(c.rows) <= maxRows {
-		return c.rows, 0
+	if len(rows) <= maxRows {
+		return rows, len(c.rows) - len(rows)
 	}
 
-	hidden := len(c.rows) - maxRows
 	if maxRows > 1 {
 		// 预留一行用于提示还有多少语言未显示
 		maxRows--
-		hidden = len(c.rows) - maxRows
 	}
-	return c.rows[:maxRows], hidden
+	return rows[:maxRows], len(c.rows) - maxRows
 }
 
 // font 返回绘图使用的字体，直接复用控件的系统默认字体。
@@ -211,6 +236,8 @@ func (c *barChart) font() *walk.Font {
 
 // chartLayout 记录条形图中各列的横向位置。
 type chartLayout struct {
+	badgeSize  int
+	nameX      int
 	nameWidth  int
 	barX       int
 	barWidth   int
@@ -218,18 +245,25 @@ type chartLayout struct {
 }
 
 // newChartLayout 依据可用宽度计算各列位置，窗口过窄时自动压缩语言名宽度。
-func newChartLayout(bounds walk.Rectangle) chartLayout {
+func newChartLayout(bounds walk.Rectangle, showIcons bool) chartLayout {
+	badgeSize := 0
+	iconWidth := 0
+	if showIcons {
+		badgeSize = chartBadgeSize
+		iconWidth = chartBadgeSize + chartGap
+	}
+
+	nameX := chartPadding + iconWidth
+
 	nameWidth := chartNameWidth
-	if nameWidth > bounds.Width/4 {
-		nameWidth = bounds.Width / 4
+	if limit := (bounds.Width - iconWidth) / 4; nameWidth > limit {
+		nameWidth = limit
 	}
 	if nameWidth < 60 {
 		nameWidth = 60
 	}
 
-	barX := func(width int) int {
-		return chartPadding + chartBadgeSize + chartGap + width + chartGap
-	}
+	barX := func(width int) int { return nameX + width + chartGap }
 
 	barWidth := bounds.Width - barX(nameWidth) - chartValueWidth - chartPadding
 	if barWidth < 60 {
@@ -243,7 +277,14 @@ func newChartLayout(bounds walk.Rectangle) chartLayout {
 		barWidth = 20
 	}
 
-	return chartLayout{nameWidth: nameWidth, barX: barX(nameWidth), barWidth: barWidth, valueWidth: chartValueWidth}
+	return chartLayout{
+		badgeSize:  badgeSize,
+		nameX:      nameX,
+		nameWidth:  nameWidth,
+		barX:       barX(nameWidth),
+		barWidth:   barWidth,
+		valueWidth: chartValueWidth,
+	}
 }
 
 // barLength 按比例计算条形长度，保证有数据的语言至少显示一小段。

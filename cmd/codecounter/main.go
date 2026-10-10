@@ -67,6 +67,20 @@ func run() error {
 		return nil
 	}
 
+	// 默认进入图形界面：排除规则由配置文件决定，--path 可覆盖初始统计目录
+	if !*cliMode && !*jsonMode {
+		if err := ui.Run(ui.Options{
+			Version:    version,
+			InitialDir: *pathFlag,
+			Workers:    *workers,
+		}); err != nil {
+			ui.ShowError("CodeCounter 启动失败", err)
+			return err
+		}
+		return nil
+	}
+
+	// 以下为命令行模式：目录缺省为当前工作目录，排除规则可由参数覆盖
 	root := *pathFlag
 	if root == "" {
 		wd, err := os.Getwd()
@@ -80,20 +94,6 @@ func run() error {
 	matcher, err := buildMatcher(*noDefaults, *extraRules, *useGitIgnore, root, len(files) > 0)
 	if err != nil {
 		return err
-	}
-
-	// 默认进入图形界面；命令行模式用于脚本与 CI
-	if !*cliMode && !*jsonMode {
-		if err := ui.Run(ui.Options{
-			Version:    version,
-			InitialDir: root,
-			Matcher:    matcher,
-			Workers:    *workers,
-		}); err != nil {
-			ui.ShowError("CodeCounter 启动失败", err)
-			return err
-		}
-		return nil
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
