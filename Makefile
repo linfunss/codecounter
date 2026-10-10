@@ -8,7 +8,7 @@ BINARY  := codecounter.exe
 VERSION ?= 0.1.0-dev
 LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: all build build-gui test vet fmt tidy clean run
+.PHONY: all build build-gui test vet fmt tidy clean run winres
 
 all: fmt vet test build
 
@@ -19,6 +19,12 @@ build:
 ## build-gui: 构建发布版本，隐藏控制台窗口
 build-gui:
 	go build -ldflags "-H=windowsgui $(LDFLAGS)" -o $(BINARY) ./cmd/codecounter
+
+## winres: 重新生成 Windows 资源文件（应用清单）
+## 说明：cmd/codecounter 下的 .syso 文件由 winres/app.manifest 生成，
+##       已纳入版本管理，只有修改清单后才需要重新执行。
+winres:
+	go generate ./cmd/codecounter
 
 ## test: 运行全部单元测试
 test:

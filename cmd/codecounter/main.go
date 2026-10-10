@@ -1,9 +1,13 @@
 // CodeCounter 是一个用于统计项目代码行数的小工具。
 //
 // 程序会扫描指定目录（缺省为当前工作目录），按语言聚合代码行数，
-// 自动跳过 node_modules、.idea 之类的冗余目录，并以排行榜的形式展示结果。
+// 自动跳过 node_modules、.idea 之类的冗余目录，并以排行榜与条形图展示结果。
 //
-// 当前阶段提供命令行模式；图形界面在后续阶段接入。
+// 默认启动 Windows 原生图形界面；使用 --cli 或 --json 时改为命令行输出，
+// 便于在脚本或 CI 中直接使用。
+//go:generate go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -manifest ../../winres/app.manifest -o rsrc_windows_amd64.syso
+//go:generate go run github.com/akavel/rsrc@v0.10.2 -arch arm64 -manifest ../../winres/app.manifest -o rsrc_windows_arm64.syso
+
 package main
 
 import (
@@ -19,7 +23,9 @@ import (
 	"syscall"
 
 	"github.com/linfunss/codecounter/internal/counter"
+	"github.com/linfunss/codecounter/internal/format"
 	"github.com/linfunss/codecounter/internal/ignore"
+	"github.com/linfunss/codecounter/internal/ui"
 )
 
 // 以下变量在构建时通过 -ldflags 注入。
@@ -29,7 +35,7 @@ var (
 	date    = "unknown"
 )
 
-// barWidth 是排行榜中条形图的最大宽度（以字符计）。
+// barWidth 是命令行排行榜中条形图的最大宽度（以字符计）。
 const barWidth = 40
 
 func main() {
@@ -39,18 +45,19 @@ func main() {
 	}
 }
 
-// run 负责解析参数、执行统计并输出结果。
+// run 负责解析参数，并按模式执行统计或启动界面。
 func run() error {
 	var (
 		pathFlag     = flag.String("path", "", "要统计的目录，缺省为当前工作目录")
 		fileFlag     = flag.String("file", "", "只统计指定的文件，多个文件以分号分隔")
-		jsonMode     = flag.Bool("json", false, "以 JSON 格式输出统计结果")
+		cliMode      = flag.Bool("cli", false, "以命令行方式输出统计结果")
+		jsonMode     = flag.Bool("json", false, "以 JSON 格式输出统计结果（隐含命令行模式）")
 		noDefaults   = flag.Bool("no-default-ignore", false, "不启用内置的默认排除名单")
 		extraRules   = flag.String("ignore", "", "附加排除规则，多条以分号分隔，支持 glob 与 ! 取反")
 		useGitIgnore = flag.Bool("use-gitignore", true, "读取统计目录下的 .gitignore")
 		maxSize      = flag.Int64("max-size", counter.MaxFileSize, "单个文件大小上限（字节），超过则跳过")
 		workers      = flag.Int("workers", 0, "统计并发数，缺省为 CPU 核心数")
-		topN         = flag.Int("top", 20, "排行榜显示的语言数量，0 表示不限")
+		topN         = flag.Int("top", 20, "命令行排行榜显示的语言数量，0 表示不限")
 		showVersion  = flag.Bool("version", false, "显示版本信息后退出")
 	)
 	flag.Parse()
@@ -60,10 +67,8 @@ func run() error {
 		return nil
 	}
 
-	files := splitList(*fileFlag)
 	root := *pathFlag
-	if len(files) == 0 && root == "" {
-		// 未指定目录时统计启动程序时的工作目录
+	if root == "" {
 		wd, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("获取当前工作目录失败: %w", err)
@@ -71,9 +76,24 @@ func run() error {
 		root = wd
 	}
 
+	files := splitList(*fileFlag)
 	matcher, err := buildMatcher(*noDefaults, *extraRules, *useGitIgnore, root, len(files) > 0)
 	if err != nil {
 		return err
+	}
+
+	// 默认进入图形界面；命令行模式用于脚本与 CI
+	if !*cliMode && !*jsonMode {
+		if err := ui.Run(ui.Options{
+			Version:    version,
+			InitialDir: root,
+			Matcher:    matcher,
+			Workers:    *workers,
+		}); err != nil {
+			ui.ShowError("CodeCounter 启动失败", err)
+			return err
+		}
+		return nil
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -148,7 +168,7 @@ func renderText(w io.Writer, res *counter.Result, topN int) {
 
 	fmt.Fprintf(w, "统计范围: %s\n", root)
 	fmt.Fprintf(w, "已统计 %d 个文件 / %s，跳过 %d 项，未识别 %d 个，读取失败 %d 个，耗时 %s\n\n",
-		res.Files, humanBytes(res.Bytes), res.Skipped, res.Unsupported, res.Failed, res.Duration.Round(1e6))
+		res.Files, format.Bytes(res.Bytes), res.Skipped, res.Unsupported, res.Failed, res.Duration.Round(1e6))
 
 	stats := res.Languages
 	truncated := false
@@ -163,7 +183,7 @@ func renderText(w io.Writer, res *counter.Result, topN int) {
 	for i, stat := range stats {
 		fmt.Fprintf(w, "%-4d %-20s %8d %12s %12s %10s\n",
 			i+1, stat.Language, stat.Files,
-			formatInt(stat.Code), formatInt(stat.Comment), formatInt(stat.Blank))
+			format.Int(stat.Code), format.Int(stat.Comment), format.Int(stat.Blank))
 	}
 	if len(stats) == 0 {
 		fmt.Fprintln(w, "（没有可统计的代码文件）")
@@ -173,7 +193,7 @@ func renderText(w io.Writer, res *counter.Result, topN int) {
 	}
 
 	fmt.Fprintf(w, "\n%-4s %-20s %8d %12s %12s %10s\n", "", "合计", res.Total.Files,
-		formatInt(res.Total.Code), formatInt(res.Total.Comment), formatInt(res.Total.Blank))
+		format.Int(res.Total.Code), format.Int(res.Total.Comment), format.Int(res.Total.Blank))
 
 	if len(stats) > 0 {
 		fmt.Fprintln(w, "\n代码行数分布")
@@ -196,7 +216,7 @@ func renderBars(w io.Writer, stats []counter.LanguageStat) {
 	// 语言名对齐宽度，避免条形图起始位置参差不齐
 	nameWidth := 0
 	for _, stat := range stats {
-		if n := displayWidth(stat.Language); n > nameWidth {
+		if n := len([]rune(stat.Language)); n > nameWidth {
 			nameWidth = n
 		}
 	}
@@ -210,62 +230,8 @@ func renderBars(w io.Writer, stats []counter.LanguageStat) {
 			filled = 1
 		}
 		bar := strings.Repeat("█", filled) + strings.Repeat(" ", barWidth-filled)
-		fmt.Fprintf(w, "%-*s %s %s\n", nameWidth, truncate(stat.Language, nameWidth), bar, formatInt(stat.Code))
+		fmt.Fprintf(w, "%-*s %s %s\n", nameWidth, truncate(stat.Language, nameWidth), bar, format.Int(stat.Code))
 	}
-}
-
-// formatInt 为整数添加千位分隔符，便于阅读较大的行数。
-func formatInt(n int64) string {
-	s := fmt.Sprintf("%d", n)
-	if len(s) <= 3 {
-		return s
-	}
-
-	sign := ""
-	if strings.HasPrefix(s, "-") {
-		sign = "-"
-		s = s[1:]
-	}
-
-	var b strings.Builder
-	pre := len(s) % 3
-	if pre > 0 {
-		b.WriteString(s[:pre])
-		if len(s) > pre {
-			b.WriteString(",")
-		}
-	}
-	for i := pre; i < len(s); i += 3 {
-		b.WriteString(s[i : i+3])
-		if i+3 < len(s) {
-			b.WriteString(",")
-		}
-	}
-	return sign + b.String()
-}
-
-// humanBytes 把字节数格式化为便于阅读的形式。
-func humanBytes(n int64) string {
-	const unit = 1024
-	if n < unit {
-		return fmt.Sprintf("%d B", n)
-	}
-
-	value := float64(n)
-	units := []string{"KiB", "MiB", "GiB", "TiB"}
-	for _, u := range units {
-		value /= unit
-		if value < unit {
-			return fmt.Sprintf("%.1f %s", value, u)
-		}
-	}
-	return fmt.Sprintf("%.1f PiB", value/unit)
-}
-
-// displayWidth 返回字符串的显示宽度。
-// 目前按字符数计算，中文等宽字符会导致轻微错位，后续在图形界面中不再需要。
-func displayWidth(s string) int {
-	return len([]rune(s))
 }
 
 // truncate 按显示宽度截断字符串，超出部分以省略号结尾。
