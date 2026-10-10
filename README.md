@@ -14,7 +14,7 @@
 - 默认统计**启动时的工作目录**，可随时切换
 - 内置冗余目录与文件排除规则，并支持自定义 glob 规则与 `!` 取反
 - 可选择读取统计目录下的 `.gitignore`
-- 排行榜 + 横向条形图，按代码行数降序展示，并显示语言图标
+- 排行榜 + 横向条形图，按代码行数降序展示，并显示真实语言 logo
 - 统计结果可导出为 JSON
 - 无控制台窗口，支持高 DPI，无需任何运行时依赖
 - 附带命令行模式，便于在脚本或 CI 中使用
@@ -69,6 +69,9 @@ go build -ldflags "-H=windowsgui" -o codecounter.exe ./cmd/codecounter
 （通用控件 6.0 与高 DPI 感知）。它由图 `winres/app.manifest` 生成并
 纳入版本管理，修改清单后执行 `go generate ./cmd/codecounter` 重新生成。
 
+`internal/ui/assets/icons` 下的语言图标已随仓库提交，通常不需要重新生成。
+如需更新，执行 `make icons`（需要联网），图标来源与许可见 [NOTICE](NOTICE)。
+
 ## 命令行用法
 
 ```powershell
@@ -114,6 +117,7 @@ codecounter --version
 - [贡献指南](CONTRIBUTING.md)
 - [变更记录](CHANGELOG.md)
 - [安全策略](SECURITY.md)
+- [第三方资源说明](NOTICE)
 
 ## 许可证
 
