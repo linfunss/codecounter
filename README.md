@@ -8,7 +8,9 @@
 `node_modules`、`.idea` 等冗余内容，并以「排行榜 + 条形图 + 语言图标」
 直观展示各语言的代码量。
 
-![界面截图](docs/images/screenshot.png)
+![主界面与设置界面](docs/images/screenshot.png)
+
+左为主界面，右为错开叠放的设置对话框（「排除规则」页）。
 
 > 界面使用 Win32 原生控件（`lxn/walk`），不依赖 WebView，跟随系统主题，支持高 DPI。
 
