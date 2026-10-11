@@ -95,7 +95,7 @@ func chooseFolder(owner walk.Form, title, initialDir string) (dir string, ok boo
 	// RPC_E_CHANGED_MODE 表示已用其它套间初始化，此时沿用现有套间即可。
 	hr, _, _ := procCoInitializeEx.Call(0, coinitApartment)
 	if hr == 0 {
-		defer procCoUninitialize.Call()
+		defer func() { _, _, _ = procCoUninitialize.Call() }()
 	} else if hr != sFalse && hr != rpcEChangedMode {
 		return "", false
 	}
@@ -152,7 +152,7 @@ func chooseFolder(owner walk.Form, title, initialDir string) (dir string, ok boo
 	if comCall(result, methodGetDisplayName, sigdnFileSysPath, uintptr(unsafe.Pointer(&namePtr))) != 0 || namePtr == nil {
 		return "", false
 	}
-	defer procCoTaskMemFree.Call(uintptr(unsafe.Pointer(namePtr)))
+	defer func() { _, _, _ = procCoTaskMemFree.Call(uintptr(unsafe.Pointer(namePtr))) }()
 
 	return windows.UTF16PtrToString(namePtr), true
 }

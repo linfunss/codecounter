@@ -50,8 +50,7 @@ type prefsDialog struct {
 	// apply 由调用方提供，负责保存并立即生效。
 	apply func(config.Config) error
 
-	dlg  *walk.Dialog
-	tabs *walk.TabWidget
+	dlg *walk.Dialog
 
 	dirModeCombo *walk.ComboBox
 	fixedDirEdit *walk.LineEdit
