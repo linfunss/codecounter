@@ -7,6 +7,10 @@
 
 ## [未发布]
 
+暂无。
+
+## [0.2.0] - 2026-10-11
+
 ### 修复
 
 - 修复设置无法保存的问题：原先在对话框关闭后才读取控件，而 walk 会在关闭时
@@ -69,5 +73,6 @@
 
 - 界面依赖 `lxn/walk`，因此本项目仅支持 Windows
 
-[未发布]: https://github.com/linfunss/codecounter/compare/v0.1.0...HEAD
+[未发布]: https://github.com/linfunss/codecounter/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/linfunss/codecounter/releases/tag/v0.2.0
 [0.1.0]: https://github.com/linfunss/codecounter/releases/tag/v0.1.0
