@@ -29,12 +29,6 @@ var dirModeValues = []config.DirMode{
 	config.DirModeFixed,
 }
 
-// maxBarsLabels 是条形图显示数量上限的候选项。
-var maxBarsLabels = []string{"10", "20", "30", "50", "不限"}
-
-// maxBarsValues 与 maxBarsLabels 一一对应，0 表示不限。
-var maxBarsValues = []int{10, 20, 30, 50, 0}
-
 // scaleLabels 是界面缩放系数的候选项。
 var scaleLabels = []string{"80%", "90%", "100%", "110%", "125%", "150%"}
 
@@ -567,16 +561,6 @@ func indexOfDirMode(mode config.DirMode) int {
 		}
 	}
 	return 0
-}
-
-// indexOfMaxBars 返回数量上限在下拉框中的下标，未知取值回退到「20」。
-func indexOfMaxBars(value int) int {
-	for i, v := range maxBarsValues {
-		if v == value {
-			return i
-		}
-	}
-	return 1
 }
 
 // indexOfScale 返回缩放系数在下拉框中的下标，未知取值回退到「100%」。
