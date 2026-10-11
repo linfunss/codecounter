@@ -32,8 +32,21 @@ const (
 // Version 是当前配置结构版本，便于后续做兼容处理。
 const Version = 1
 
+// 界面缩放的可用区间。
+const (
+	// MinScale 是最小界面缩放系数。
+	MinScale = 0.8
+	// MaxScale 是最大界面缩放系数。
+	MaxScale = 1.6
+)
+
 // appDirName 是配置在用户配置目录下的子目录名。
 const appDirName = "CodeCounter"
+
+// EnvConfigDir 是覆盖配置目录的环境变量名。
+//
+// 设置后配置会存放在该目录，便于便携部署，也便于测试时隔离配置。
+const EnvConfigDir = "CODECOUNTER_CONFIG_DIR"
 
 // Config 是持久化的用户配置。
 type Config struct {
@@ -57,6 +70,10 @@ type Config struct {
 	ShowLanguageIcons bool `json:"showLanguageIcons"`
 	// MaxBars 是条形图最多显示的语言数量，0 表示不限。
 	MaxBars int `json:"maxBars"`
+	// ShowPercent 控制条形图是否显示代码行数占比。
+	ShowPercent bool `json:"showPercent"`
+	// Scale 是界面缩放系数，1.0 为标准大小。
+	Scale float64 `json:"scale"`
 }
 
 // Defaults 返回内置默认配置。
@@ -68,11 +85,20 @@ func Defaults() Config {
 		UseGitIgnore:       true,
 		ShowLanguageIcons:  true,
 		MaxBars:            20,
+		ShowPercent:        true,
+		Scale:              1.0,
 	}
 }
 
 // Dir 返回配置文件所在目录。
+//
+// 默认使用 %APPDATA%\CodeCounter；若设置了 CODECOUNTER_CONFIG_DIR，
+// 则改用该目录。
 func Dir() (string, error) {
+	if override := strings.TrimSpace(os.Getenv(EnvConfigDir)); override != "" {
+		return override, nil
+	}
+
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("获取用户配置目录失败: %w", err)
@@ -186,6 +212,11 @@ func (c *Config) Normalize() {
 
 	if c.MaxBars < 0 {
 		c.MaxBars = Defaults().MaxBars
+	}
+
+	// 缩放过小会看不清、过大则会挤掉内容，这里限制在可用区间内
+	if c.Scale < MinScale || c.Scale > MaxScale {
+		c.Scale = Defaults().Scale
 	}
 
 	rules := make([]string, 0, len(c.CustomExcludes))
