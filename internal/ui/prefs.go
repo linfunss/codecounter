@@ -63,7 +63,6 @@ type prefsDialog struct {
 
 	showIconsCheck   *walk.CheckBox
 	showPercentCheck *walk.CheckBox
-	maxBarsCombo     *walk.ComboBox
 	scaleCombo       *walk.ComboBox
 
 	applyButton  *walk.PushButton
@@ -313,7 +312,6 @@ func (p *prefsDialog) loadValues() {
 	_ = p.rulesEdit.SetText(strings.Join(p.current.CustomExcludes, "\r\n"))
 	p.showIconsCheck.SetChecked(p.current.ShowLanguageIcons)
 	p.showPercentCheck.SetChecked(p.current.ShowPercent)
-	_ = p.maxBarsCombo.SetCurrentIndex(indexOfMaxBars(p.current.MaxBars))
 	_ = p.scaleCombo.SetCurrentIndex(indexOfScale(p.current.Scale))
 
 	p.updateFixedDirEnabled()
@@ -340,9 +338,7 @@ func (p *prefsDialog) collect() config.Config {
 
 	cfg.ShowLanguageIcons = p.showIconsCheck.Checked()
 	cfg.ShowPercent = p.showPercentCheck.Checked()
-	if bars := p.maxBarsCombo.CurrentIndex(); bars >= 0 && bars < len(maxBarsValues) {
-		cfg.MaxBars = 0
-	}
+	cfg.MaxBars = 0 // 图表通过滚动展示全部语言。
 	if scale := p.scaleCombo.CurrentIndex(); scale >= 0 && scale < len(scaleValues) {
 		cfg.Scale = scaleValues[scale]
 	}
@@ -604,7 +600,7 @@ func (p *prefsDialog) updateDirty() {
 	p.applyButton.SetEnabled(!reflect.DeepEqual(p.collect(), p.saved))
 }
 func (p *prefsDialog) watchChanges() {
-	for _, c := range []*walk.ComboBox{p.dirModeCombo, p.maxBarsCombo, p.scaleCombo} {
+	for _, c := range []*walk.ComboBox{p.dirModeCombo, p.scaleCombo} {
 		c.CurrentIndexChanged().Attach(p.updateDirty)
 	}
 	for _, c := range []*walk.CheckBox{p.useDefaultsCheck, p.useGitIgnoreCheck, p.showIconsCheck, p.showPercentCheck} {

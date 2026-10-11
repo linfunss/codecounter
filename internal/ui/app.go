@@ -38,7 +38,7 @@ var layoutBaseMetrics = struct {
 	tableRowH    int
 	chartHeight  int
 }{
-	windowWidth:  860,
+	windowWidth:  780,
 	windowHeight: 560,
 	tableMinH:    140,
 	tableRowH:    21,
@@ -259,7 +259,7 @@ func (a *App) applyFontScale(scale float64) {
 		return
 	}
 
-	pointSize := int(float64(a.baseFont.PointSize())*scale + 0.5)
+	pointSize := int(float64(a.baseFont.PointSize()+1)*scale + 0.5)
 	if pointSize < 6 {
 		pointSize = 6
 	}
