@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/lxn/walk"
@@ -62,9 +63,10 @@ type prefsDialog struct {
 
 	showIconsCheck   *walk.CheckBox
 	showPercentCheck *walk.CheckBox
-	maxBarsCombo     *walk.ComboBox
 	scaleCombo       *walk.ComboBox
 
+	applyButton  *walk.PushButton
+	saved        config.Config
 	okButton     *walk.PushButton
 	cancelButton *walk.PushButton
 }
@@ -87,6 +89,9 @@ func showPrefs(owner walk.Form, version string, current config.Config, root stri
 	}
 
 	p.loadValues()
+	p.saved = p.collect()
+	p.watchChanges()
+	p.updateDirty()
 	p.dlg.Run()
 	return nil
 }
@@ -101,8 +106,8 @@ func (p *prefsDialog) create() error {
 	if err := (decl.Dialog{
 		AssignTo: &p.dlg,
 		Title:    "CodeCounter 设置",
-		MinSize:  decl.Size{Width: 560, Height: 470},
-		Size:     decl.Size{Width: 600, Height: 500},
+		MinSize:  decl.Size{Width: 560, Height: 350},
+		Size:     decl.Size{Width: 600, Height: 420},
 		Layout:   decl.VBox{MarginsZero: true},
 		Children: []decl.Widget{
 			decl.TabWidget{
@@ -132,7 +137,7 @@ func (p *prefsDialog) create() error {
 				Children: []decl.Widget{
 					decl.PushButton{Text: "恢复默认", OnClicked: p.restoreDefaults},
 					decl.HSpacer{},
-					decl.PushButton{Text: "应用", OnClicked: p.applyCurrent},
+					decl.PushButton{AssignTo: &p.applyButton, Text: "应用", OnClicked: p.applyCurrent},
 					decl.PushButton{
 						AssignTo:  &p.okButton,
 						Text:      "确定",
@@ -152,6 +157,7 @@ func (p *prefsDialog) create() error {
 		return err
 	}
 
+	p.dlg.SetFont(p.owner.Font())
 	if icon := appIcon(); icon != nil {
 		_ = p.dlg.SetIcon(icon)
 	}
@@ -267,15 +273,7 @@ func (p *prefsDialog) displayPage() decl.TabPage {
 				Text:      "在条形图中显示代码行数占比",
 				Alignment: decl.AlignHNearVCenter,
 			},
-			decl.Composite{
-				Layout: decl.HBox{},
-				Children: []decl.Widget{
-					decl.Label{Text: "条形图最多显示:"},
-					decl.ComboBox{AssignTo: &p.maxBarsCombo, Model: maxBarsLabels},
-					decl.Label{Text: "种语言"},
-					decl.HSpacer{},
-				},
-			},
+
 			decl.Composite{
 				Layout: decl.HBox{},
 				Children: []decl.Widget{
@@ -314,7 +312,6 @@ func (p *prefsDialog) loadValues() {
 	_ = p.rulesEdit.SetText(strings.Join(p.current.CustomExcludes, "\r\n"))
 	p.showIconsCheck.SetChecked(p.current.ShowLanguageIcons)
 	p.showPercentCheck.SetChecked(p.current.ShowPercent)
-	_ = p.maxBarsCombo.SetCurrentIndex(indexOfMaxBars(p.current.MaxBars))
 	_ = p.scaleCombo.SetCurrentIndex(indexOfScale(p.current.Scale))
 
 	p.updateFixedDirEnabled()
@@ -341,9 +338,7 @@ func (p *prefsDialog) collect() config.Config {
 
 	cfg.ShowLanguageIcons = p.showIconsCheck.Checked()
 	cfg.ShowPercent = p.showPercentCheck.Checked()
-	if bars := p.maxBarsCombo.CurrentIndex(); bars >= 0 && bars < len(maxBarsValues) {
-		cfg.MaxBars = maxBarsValues[bars]
-	}
+	cfg.MaxBars = 0 // 图表通过滚动展示全部语言。
 	if scale := p.scaleCombo.CurrentIndex(); scale >= 0 && scale < len(scaleValues) {
 		cfg.Scale = scaleValues[scale]
 	}
@@ -362,6 +357,9 @@ func (p *prefsDialog) applyCurrent() {
 	}
 
 	p.current = cfg
+	p.saved = cfg
+	p.dlg.SetFont(p.owner.Font())
+	p.updateDirty()
 	p.refreshStaleHint()
 }
 
@@ -536,6 +534,7 @@ func (p *prefsDialog) restoreDefaults() {
 	p.current = config.Defaults()
 	p.current.LastDir = last
 	p.loadValues()
+	p.updateDirty()
 }
 
 // openConfigDir 在资源管理器中打开配置目录。
@@ -595,4 +594,18 @@ func splitRuleLines(text string) []string {
 		}
 	}
 	return rules
+}
+
+func (p *prefsDialog) updateDirty() {
+	p.applyButton.SetEnabled(!reflect.DeepEqual(p.collect(), p.saved))
+}
+func (p *prefsDialog) watchChanges() {
+	for _, c := range []*walk.ComboBox{p.dirModeCombo, p.scaleCombo} {
+		c.CurrentIndexChanged().Attach(p.updateDirty)
+	}
+	for _, c := range []*walk.CheckBox{p.useDefaultsCheck, p.useGitIgnoreCheck, p.showIconsCheck, p.showPercentCheck} {
+		c.CheckedChanged().Attach(p.updateDirty)
+	}
+	p.fixedDirEdit.TextChanged().Attach(p.updateDirty)
+	p.rulesEdit.TextChanged().Attach(p.updateDirty)
 }

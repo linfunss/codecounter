@@ -19,7 +19,7 @@ func TestBarLength(t *testing.T) {
 		{0, 100, 200, 0},
 		{100, 100, 200, 200},
 		{50, 100, 200, 100},
-		{1, 1000, 200, 4},
+		{1, 1000, 200, 1},
 		{200, 100, 200, 200}, // 超过最大值时截断到可用宽度
 		{10, 0, 200, 0},
 		{10, 100, 0, 0},
@@ -51,8 +51,8 @@ func TestVisibleRows(t *testing.T) {
 	// 高度受限时裁剪，并预留一行提示
 	bounds = walk.Rectangle{Width: 800, Height: 150}
 	visible, hidden = chart.visibleRows(bounds, newChartMetrics(1))
-	if hidden == 0 {
-		t.Error("高度受限时应报告被隐藏的行数")
+	if hidden != 0 || len(visible) != 10 {
+		t.Error("滚动内容必须保留全部语言")
 	}
 	if len(visible)+hidden != 10 {
 		t.Errorf("显示 %d 行 + 隐藏 %d 行 != 总数 10", len(visible), hidden)

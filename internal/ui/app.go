@@ -38,11 +38,11 @@ var layoutBaseMetrics = struct {
 	tableRowH    int
 	chartHeight  int
 }{
-	windowWidth:  980,
-	windowHeight: 640,
+	windowWidth:  780,
+	windowHeight: 560,
 	tableMinH:    140,
 	tableRowH:    21,
-	chartHeight:  322,
+	chartHeight:  150,
 }
 
 // layoutMetrics 是按缩放系数换算后的窗口布局尺寸。
@@ -79,9 +79,7 @@ func newLayoutMetrics(scale float64) layoutMetrics {
 
 // tableBaseColumnWidths 是排行榜各列在缩放系数为 1.0 时的宽度（逻辑像素）。
 //
-// 注意：walk 的 TableViewColumn.SetWidth 会触发内部重建列、清掉列的对齐设置，
-// 且 SetAlignment 在值未变化时会直接返回、无法补救，因此列宽只在创建时设定一次，
-// 不提供运行期调整。用户仍可拖动列边界自行调整。
+// 调整列宽后重新设置对齐，避免 walk 重建列时丢失对齐。
 var tableBaseColumnWidths = []int{70, 200, 90, 120, 120, 100, 130}
 
 // scaledColumnWidths 依据缩放系数计算排行榜列宽。
@@ -171,66 +169,69 @@ func (a *App) create() error {
 		MinSize:  decl.Size{Width: 720, Height: 480},
 		Size:     decl.Size{Width: m.windowWidth, Height: m.windowHeight},
 		Layout:   decl.VBox{MarginsZero: true},
-		ToolBar: decl.ToolBar{
-			// 默认样式为仅显示图标，这里改用文字按钮
-			ButtonStyle: decl.ToolBarButtonTextOnly,
-			Items: []decl.MenuItem{
-				decl.Action{Text: "选择目录", OnTriggered: func() { a.chooseDir() }},
-				decl.Action{Text: "选择文件", OnTriggered: func() { a.chooseFiles() }},
-				decl.Action{Text: "重新统计", OnTriggered: func() { a.rescan() }},
-				decl.Action{Text: "导出 JSON", OnTriggered: func() { a.exportJSON() }},
-				decl.Action{Text: "设置", OnTriggered: func() { a.openPrefs() }},
-			},
-		},
+
+		ToolBar: decl.ToolBar{ButtonStyle: decl.ToolBarButtonTextOnly, Items: []decl.MenuItem{
+			decl.Action{Text: "选择目录", OnTriggered: a.chooseDir},
+			decl.Action{Text: "选择文件", OnTriggered: a.chooseFiles},
+			decl.Action{Text: "重新统计", OnTriggered: a.rescan},
+			decl.Action{Text: "导出 JSON", OnTriggered: a.exportJSON},
+			decl.Action{Text: "设置", OnTriggered: a.openPrefs},
+		}},
 		Children: []decl.Widget{
 			decl.Composite{
-				Layout: decl.HBox{MarginsZero: true},
+				Layout: decl.HBox{Margins: decl.Margins{Left: 10, Right: 10, Top: 4, Bottom: 4}},
 				Children: []decl.Widget{
 					decl.Label{Text: "统计范围:"},
 					decl.LineEdit{AssignTo: &a.pathEdit, ReadOnly: true, StretchFactor: 1},
 					decl.PushButton{Text: "浏览…", OnClicked: func() { a.chooseDir() }},
 				},
 			},
-			decl.GroupBox{
-				Title:         "排行榜",
-				Layout:        decl.VBox{},
-				MinSize:       decl.Size{Height: m.tableMinH},
-				StretchFactor: 1,
-				Children: []decl.Widget{
-					decl.TableView{
-						AssignTo:         &a.table,
-						Model:            a.model,
-						AlternatingRowBG: true,
-						ColumnsOrderable: false,
-						StretchFactor:    1,
+			decl.Composite{Layout: decl.VBox{Margins: decl.Margins{Left: 10, Right: 10}}, StretchFactor: 1, Children: []decl.Widget{
+				decl.VSplitter{Children: []decl.Widget{
+					decl.GroupBox{
+						Title:         "排行榜",
+						Layout:        decl.VBox{},
+						MinSize:       decl.Size{Height: m.tableMinH},
+						StretchFactor: 1,
+						Children: []decl.Widget{
+							decl.TableView{
+								AssignTo:         &a.table,
+								Model:            a.model,
+								AlternatingRowBG: true,
+								ColumnsOrderable: false,
+								StretchFactor:    1,
 
-						Columns: []decl.TableViewColumn{
-							{Title: "排名", Width: cols[0], Alignment: decl.AlignFar},
-							{Title: "语言", Width: cols[1]},
-							{Title: "文件数", Width: cols[2], Alignment: decl.AlignFar},
-							{Title: "代码行", Width: cols[3], Alignment: decl.AlignFar},
-							{Title: "注释行", Width: cols[4], Alignment: decl.AlignFar},
-							{Title: "空行", Width: cols[5], Alignment: decl.AlignFar},
-							{Title: "总行数", Width: cols[6], Alignment: decl.AlignFar},
+								Columns: []decl.TableViewColumn{
+									{Title: "排名", Width: 44, Alignment: decl.AlignCenter},
+									{Title: "语言", Width: cols[1]},
+									{Title: "文件数", Width: cols[2], Alignment: decl.AlignFar},
+									{Title: "代码行", Width: cols[3], Alignment: decl.AlignFar},
+									{Title: "注释行", Width: cols[4], Alignment: decl.AlignFar},
+									{Title: "空行", Width: cols[5], Alignment: decl.AlignFar},
+									{Title: "总行数", Width: cols[6], Alignment: decl.AlignFar},
+								},
+							},
 						},
 					},
-				},
-			},
-			decl.GroupBox{
-				Title:   "代码行数分布",
-				Layout:  decl.VBox{},
-				MinSize: decl.Size{Height: m.chartHeight},
-				MaxSize: decl.Size{Height: m.chartHeight},
-				Children: []decl.Widget{
-					decl.CustomWidget{
-						AssignTo:            &a.chart.widget,
-						StretchFactor:       1,
-						PaintMode:           decl.PaintBuffered,
-						InvalidatesOnResize: true,
-						Paint:               a.chart.paint,
+					decl.GroupBox{
+						Title:         "代码行数分布",
+						Layout:        decl.VBox{},
+						MinSize:       decl.Size{Height: m.chartHeight},
+						StretchFactor: 1,
+						Children: []decl.Widget{
+							decl.ScrollView{AssignTo: &a.chart.scroll, StretchFactor: 1, OnSizeChanged: a.chart.invalidate, HorizontalFixed: false, Layout: decl.VBox{MarginsZero: true}, Children: []decl.Widget{
+								decl.CustomWidget{
+									AssignTo:            &a.chart.widget,
+									StretchFactor:       1,
+									PaintMode:           decl.PaintBuffered,
+									InvalidatesOnResize: true,
+									Paint:               a.chart.paint,
+								},
+							}},
+						},
 					},
-				},
-			},
+				}},
+			}},
 		},
 		StatusBarItems: []decl.StatusBarItem{
 			{AssignTo: &a.status, Text: "准备就绪"},
@@ -247,6 +248,8 @@ func (a *App) create() error {
 	// 保存默认字体，作为缩放基准
 	a.baseFont = a.window.Font()
 	a.applyFontScale(a.cfg.Scale)
+	a.table.SizeChanged().Attach(a.fitColumns)
+	a.fitColumns()
 	return nil
 }
 
@@ -256,7 +259,7 @@ func (a *App) applyFontScale(scale float64) {
 		return
 	}
 
-	pointSize := int(float64(a.baseFont.PointSize())*scale + 0.5)
+	pointSize := int(float64(a.baseFont.PointSize()+1)*scale + 0.5)
 	if pointSize < 6 {
 		pointSize = 6
 	}
@@ -266,6 +269,7 @@ func (a *App) applyFontScale(scale float64) {
 		return
 	}
 	a.window.SetFont(font)
+	_ = a.window.ToolBar().SetDefaultButtonWidth(int(100 * scale))
 }
 
 // applyScale 在运行期应用新的缩放系数。
@@ -275,6 +279,7 @@ func (a *App) applyFontScale(scale float64) {
 // 表格行高会跟随控件字体自动计算，无需单独设置。
 func (a *App) applyScale(scale float64) {
 	a.applyFontScale(scale)
+	a.fitColumns()
 }
 
 // initialDir 返回启动时应统计的目录。
@@ -369,6 +374,7 @@ func (a *App) finishScan(res *counter.Result, err error) {
 
 	a.runOnUI(func() {
 		a.model.SetRows(res.Languages)
+		a.fitColumns()
 		a.chart.SetRows(res.Languages)
 
 		summary := fmt.Sprintf("已统计 %d 个文件 · 代码 %s 行 · 注释 %s 行 · 跳过 %d 项 · 耗时 %s",
@@ -561,4 +567,43 @@ func (a *App) reportError(title string, err error) {
 		a.setStatus(title)
 		walk.MsgBox(a.window, title, err.Error(), walk.MsgBoxIconError)
 	})
+}
+
+func (a *App) fitColumns() {
+	if a.table == nil {
+		return
+	}
+	width := a.table.ClientBounds().Width - 2
+	if width <= 0 {
+		return
+	}
+	rankWidth := 44
+	total := 0
+	for _, v := range tableBaseColumnWidths[1:] {
+		total += v
+	}
+	used := rankWidth
+	for i, v := range tableBaseColumnWidths {
+		n := rankWidth
+		if i > 0 {
+			n = (width - rankWidth) * v / total
+		}
+		if i == len(tableBaseColumnWidths)-1 {
+			n = width - used
+		}
+		col := a.table.Columns().At(i)
+		_ = col.SetWidth(n)
+		align := walk.AlignFar
+		if i == 0 {
+			align = walk.AlignCenter
+		}
+		if i == 1 {
+			align = walk.AlignNear
+		}
+		_ = col.SetAlignment(walk.AlignNear)
+		_ = col.SetAlignment(align)
+		if i > 0 {
+			used += n
+		}
+	}
 }
