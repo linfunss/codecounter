@@ -24,7 +24,7 @@ var chartBaseMetrics = struct {
 	rowHeight:  26,
 	badgeSize:  18,
 	nameWidth:  128,
-	valueWidth: 142, // 需要容纳「1,234 (45.2%)」
+	valueWidth: 128, // 需要容纳「1,234 (45.2%)」
 	gap:        8,
 	radius:     4,
 }
@@ -67,6 +67,7 @@ func newChartMetrics(scale float64) chartMetrics {
 
 // barChart 负责在自定义控件上绘制语言代码行数条形图。
 type barChart struct {
+	scroll *walk.ScrollView
 	widget *walk.CustomWidget
 	rows   []counter.LanguageStat
 
@@ -95,7 +96,7 @@ func (c *barChart) SetRows(rows []counter.LanguageStat) {
 func (c *barChart) SetOptions(showIcons, showPercent bool, maxBars int, scale float64) {
 	c.showIcons = showIcons
 	c.showPercent = showPercent
-	c.maxBars = maxBars
+	c.maxBars = 0
 	c.scale = scale
 	c.invalidate()
 }
@@ -103,6 +104,8 @@ func (c *barChart) SetOptions(showIcons, showPercent bool, maxBars int, scale fl
 // invalidate 在控件已创建时请求重绘。
 func (c *barChart) invalidate() {
 	if c.widget != nil {
+		m := newChartMetrics(c.scale)
+		_ = c.widget.SetMinMaxSize(walk.Size{Height: m.padding*2 + len(c.rows)*m.rowHeight}, walk.Size{})
 		// 重绘请求失败没有补救手段，忽略返回值
 		_ = c.widget.Invalidate()
 	}
@@ -153,7 +156,16 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 		}
 	}
 
-	layout := newChartLayout(bounds, c.showIcons, m)
+	// ScrollView 的内容宽度可能包含被滚动条裁掉的区域。
+	// 使用视口宽度，并始终保留右侧安全空间。
+	layoutBounds := bounds
+	if c.scroll != nil {
+		viewportWidth := c.scroll.ClientBounds().Width - 18
+		if viewportWidth > 0 && viewportWidth < layoutBounds.Width {
+			layoutBounds.Width = viewportWidth
+		}
+	}
+	layout := newChartLayout(layoutBounds, c.showIcons, m)
 	for i, r := range rows {
 		if err := c.paintRow(canvas, layout, m, i, r, maxCode, totalCode); err != nil {
 			return err
@@ -263,7 +275,7 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, m chartMetr
 		return err
 	}
 
-	if filled := barLength(stat.Code, maxCode, layout.barWidth); filled > 0 {
+	if filled := barLength(stat.Code, totalCode, layout.barWidth); filled > 0 {
 		valueRect := walk.Rectangle{X: trackRect.X, Y: trackRect.Y, Width: filled, Height: trackRect.Height}
 		value, err := walk.NewSolidColorBrush(mark.color)
 		if err != nil {
@@ -297,25 +309,7 @@ func chartValueText(code, total int64, showPercent bool) string {
 
 // visibleRows 返回当前显示选项与尺寸下能显示的行，以及未显示的行数。
 func (c *barChart) visibleRows(bounds walk.Rectangle, m chartMetrics) ([]counter.LanguageStat, int) {
-	rows := c.rows
-	if c.maxBars > 0 && len(rows) > c.maxBars {
-		rows = rows[:c.maxBars]
-	}
-
-	maxRows := (bounds.Height - m.padding*2) / m.rowHeight
-	if maxRows < 1 {
-		maxRows = 1
-	}
-
-	if len(rows) <= maxRows {
-		return rows, len(c.rows) - len(rows)
-	}
-
-	if maxRows > 1 {
-		// 预留一行用于提示还有多少语言未显示
-		maxRows--
-	}
-	return rows[:maxRows], len(c.rows) - maxRows
+	return c.rows, 0
 }
 
 // font 返回绘图使用的字体，直接复用控件的系统默认字体。
@@ -358,13 +352,13 @@ func newChartLayout(bounds walk.Rectangle, showIcons bool, m chartMetrics) chart
 
 	barX := func(width int) int { return nameX + width + m.gap }
 
-	barWidth := bounds.Width - barX(nameWidth) - m.valueWidth - m.padding
+	barWidth := bounds.Width - barX(nameWidth) - m.valueWidth - m.gap - m.padding*2
 	if barWidth < m.gap*5 {
 		nameWidth -= m.gap*5 - barWidth
 		if nameWidth < m.gap*5 {
 			nameWidth = m.gap * 5
 		}
-		barWidth = bounds.Width - barX(nameWidth) - m.valueWidth - m.padding
+		barWidth = bounds.Width - barX(nameWidth) - m.valueWidth - m.gap - m.padding*2
 	}
 	if barWidth < m.gap*2 {
 		barWidth = m.gap * 2
@@ -387,8 +381,8 @@ func barLength(code, maxCode int64, width int) int {
 	}
 
 	filled := int(float64(width) * float64(code) / float64(maxCode))
-	if filled < 4 {
-		filled = 4
+	if filled < 1 {
+		filled = 1
 	}
 	if filled > width {
 		filled = width
