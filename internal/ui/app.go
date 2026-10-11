@@ -14,6 +14,7 @@ import (
 
 	"github.com/lxn/walk"
 	decl "github.com/lxn/walk/declarative"
+	"github.com/lxn/win"
 
 	"github.com/linfunss/codecounter/internal/config"
 	"github.com/linfunss/codecounter/internal/counter"
@@ -167,7 +168,7 @@ func (a *App) create() error {
 		Font:    decl.Font{Family: uiFontFamily(), PointSize: scaledPointSize(a.cfg.Scale)},
 		MinSize: decl.Size{Width: 720, Height: 480},
 		Size:    decl.Size{Width: m.windowWidth, Height: m.windowHeight},
-		Layout:  decl.VBox{MarginsZero: true},
+		Layout:  decl.VBox{MarginsZero: true, SpacingZero: true},
 
 		ToolBar: decl.ToolBar{ButtonStyle: decl.ToolBarButtonTextOnly, Items: []decl.MenuItem{
 			decl.Action{Text: "选择目录", OnTriggered: a.chooseDir},
@@ -178,14 +179,19 @@ func (a *App) create() error {
 		}},
 		Children: []decl.Widget{
 			decl.Composite{
-				Layout: decl.HBox{Margins: decl.Margins{Left: 10, Right: 10, Top: 4, Bottom: 4}},
+				// 与下方排行榜、图表使用同一组左右内边距，标题与分组框左边对齐
+				Layout: decl.HBox{Margins: decl.Margins{
+					Left: uiMarginH, Right: uiMarginH, Top: uiMarginV, Bottom: uiMarginV,
+				}},
 				Children: []decl.Widget{
 					decl.Label{Text: "统计范围:"},
 					decl.LineEdit{AssignTo: &a.pathEdit, ReadOnly: true, StretchFactor: 1},
 					decl.PushButton{Text: "浏览…", OnClicked: func() { a.chooseDir() }},
 				},
 			},
-			decl.Composite{Layout: decl.VBox{Margins: decl.Margins{Left: 10, Right: 10}}, StretchFactor: 1, Children: []decl.Widget{
+			decl.Composite{Layout: decl.VBox{Margins: decl.Margins{
+				Left: uiMarginH, Right: uiMarginH, Bottom: uiMarginV,
+			}}, StretchFactor: 1, Children: []decl.Widget{
 				decl.VSplitter{Children: []decl.Widget{
 					decl.GroupBox{
 						Title:         "排行榜",
@@ -565,14 +571,27 @@ func (a *App) reportError(title string, err error) {
 	})
 }
 
+// fitColumns 按当前可用宽度重新分配排行榜列宽。
+//
+// 表格内部是原生列表视图，竖向滚动条画在客户区内部：行数超出可视高度时，
+// 滚动条会盖住最后一列，同时压窄可用宽度并触发横向滚动条。因此分配列宽
+// 之前必须先扣掉滚动条占用的宽度。
 func (a *App) fitColumns() {
 	if a.table == nil {
 		return
 	}
-	width := a.table.ClientBounds().Width - 2
+
+	width := a.table.ClientBounds().Width
+	if a.tableNeedsVScrollBar() {
+		width -= tableScrollBarWidth(a.table.DPI())
+	}
+	// 外层容器比内部列表视图宽 2 像素（列表视图自身边框），这里一并扣掉，
+	// 让各列宽度之和正好落在可视区域内，不会再触发横向滚动条。
+	width -= 2
 	if width <= 0 {
 		return
 	}
+
 	rankWidth := 44
 	total := 0
 	for _, v := range tableBaseColumnWidths[1:] {
@@ -602,4 +621,41 @@ func (a *App) fitColumns() {
 			used += n
 		}
 	}
+}
+
+// tableNeedsVScrollBar 判断排行榜当前是否需要竖向滚动条。
+//
+// 原生列表视图的竖向滚动条画在客户区内部，只有行数超过可视行数时才会出现，
+// 因此用行数与每页行数比较即可判断。
+func (a *App) tableNeedsVScrollBar() bool {
+	model := a.table.TableModel()
+	if model == nil {
+		return false
+	}
+
+	rows := model.RowCount()
+	if rows <= 0 {
+		return false
+	}
+
+	perPage := a.table.RowsPerPage()
+	return perPage > 0 && rows > perPage
+}
+
+// tableScrollBarWidth 返回表格竖向滚动条占用的宽度（96 DPI 逻辑像素）。
+func tableScrollBarWidth(dpi int) int {
+	if dpi <= 0 {
+		dpi = 96
+	}
+
+	// GetSystemMetricsForDpi 需要 Windows 10 1607 以上，取不到值时退回系统度量
+	physical := int(win.GetSystemMetricsForDpi(win.SM_CXVSCROLL, uint32(dpi)))
+	if physical <= 0 {
+		physical = int(win.GetSystemMetrics(win.SM_CXVSCROLL))
+	}
+	if physical <= 0 {
+		return 17
+	}
+
+	return walk.IntTo96DPI(physical, dpi)
 }
