@@ -103,9 +103,13 @@ func (p *prefsDialog) create() error {
 		configPath = "（无法确定配置路径）"
 	}
 
+	// 对话框直接沿用主窗口的字体族与字号，保证标签页里的控件也有同样的缩放
+	ownerFont := p.owner.Font()
+
 	if err := (decl.Dialog{
 		AssignTo: &p.dlg,
 		Title:    "CodeCounter 设置",
+		Font:     decl.Font{Family: ownerFont.Family(), PointSize: ownerFont.PointSize()},
 		MinSize:  decl.Size{Width: 560, Height: 350},
 		Size:     decl.Size{Width: 600, Height: 420},
 		Layout:   decl.VBox{MarginsZero: true},
@@ -158,6 +162,8 @@ func (p *prefsDialog) create() error {
 	}
 
 	p.dlg.SetFont(p.owner.Font())
+	// 与主窗口保持一致，使用 Windows 10 的直角窗框
+	useWindows10WindowFrame(p.dlg.Handle())
 	if icon := appIcon(); icon != nil {
 		_ = p.dlg.SetIcon(icon)
 	}
@@ -221,7 +227,7 @@ func (p *prefsDialog) excludePage() decl.TabPage {
 						Text:     strings.Join(ignore.DefaultRules(), "、"),
 						ReadOnly: true,
 						VScroll:  true,
-						MinSize:  decl.Size{Height: 72},
+						MinSize:  decl.Size{Height: 56},
 					},
 				},
 			},
@@ -244,7 +250,7 @@ func (p *prefsDialog) excludePage() decl.TabPage {
 						VScroll:       true,
 						HScroll:       true,
 						StretchFactor: 1,
-						MinSize:       decl.Size{Height: 90},
+						MinSize:       decl.Size{Height: 72},
 						OnTextChanged: p.refreshStaleHint,
 					},
 					decl.Label{AssignTo: &p.staleLabel},
