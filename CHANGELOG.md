@@ -7,6 +7,10 @@
 
 ## [未发布]
 
+暂无。
+
+## [0.2.4] - 2026-10-12
+
 ### 修复
 
 - 排行榜出现竖向滚动条时，滚动条会盖住最后一列并压出多余的横向滚动条；
@@ -24,6 +28,10 @@
 
 - 用 Win32 探针实测：列宽合计与列表视图可视宽度一致，横向滚动条不再出现。
 - 在 150% 缩放的显示器上截图核对主窗口与设置四个标签页的对齐效果。
+
+### 文档
+
+- README 首页截图更换为主界面与设置「排除规则」页错开叠放的合成图。
 
 ## [0.2.3] - 2026-10-12
 
@@ -134,7 +142,8 @@
 
 - 界面依赖 `lxn/walk`，因此本项目仅支持 Windows
 
-[未发布]: https://github.com/linfunss/codecounter/compare/v0.2.3...HEAD
+[未发布]: https://github.com/linfunss/codecounter/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/linfunss/codecounter/releases/tag/v0.2.4
 [0.2.3]: https://github.com/linfunss/codecounter/releases/tag/v0.2.3
 [0.2.0]: https://github.com/linfunss/codecounter/releases/tag/v0.2.0
 [0.1.0]: https://github.com/linfunss/codecounter/releases/tag/v0.1.0
