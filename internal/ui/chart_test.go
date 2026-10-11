@@ -43,14 +43,14 @@ func TestVisibleRows(t *testing.T) {
 
 	// 高度足够时全部显示
 	bounds := walk.Rectangle{Width: 800, Height: 1000}
-	visible, hidden := chart.visibleRows(bounds)
+	visible, hidden := chart.visibleRows(bounds, newChartMetrics(1))
 	if len(visible) != 10 || hidden != 0 {
 		t.Fatalf("高度充足时应全部显示，实际显示 %d 行，隐藏 %d 行", len(visible), hidden)
 	}
 
 	// 高度受限时裁剪，并预留一行提示
 	bounds = walk.Rectangle{Width: 800, Height: 150}
-	visible, hidden = chart.visibleRows(bounds)
+	visible, hidden = chart.visibleRows(bounds, newChartMetrics(1))
 	if hidden == 0 {
 		t.Error("高度受限时应报告被隐藏的行数")
 	}
@@ -63,7 +63,7 @@ func TestVisibleRows(t *testing.T) {
 func TestNewChartLayoutFitsBounds(t *testing.T) {
 	for _, width := range []int{700, 880, 1040, 1600} {
 		bounds := walk.Rectangle{Width: width, Height: 400}
-		layout := newChartLayout(bounds, true)
+		layout := newChartLayout(bounds, true, newChartMetrics(1))
 
 		if layout.barWidth < 20 {
 			t.Errorf("宽度 %d 时条形宽度过小: %d", width, layout.barWidth)

@@ -30,6 +30,77 @@ type Options struct {
 	Workers int
 }
 
+// layoutBaseMetrics 是缩放系数为 1.0 时的窗口布局尺寸（逻辑像素）。
+var layoutBaseMetrics = struct {
+	windowWidth  int
+	windowHeight int
+	tableMinH    int
+	tableRowH    int
+	chartHeight  int
+}{
+	windowWidth:  980,
+	windowHeight: 640,
+	tableMinH:    140,
+	tableRowH:    21,
+	chartHeight:  322,
+}
+
+// layoutMetrics 是按缩放系数换算后的窗口布局尺寸。
+type layoutMetrics struct {
+	windowWidth  int
+	windowHeight int
+	tableMinH    int
+	tableRowH    int
+	chartHeight  int
+}
+
+// newLayoutMetrics 依据缩放系数计算窗口布局尺寸。
+func newLayoutMetrics(scale float64) layoutMetrics {
+	if scale <= 0 {
+		scale = 1
+	}
+
+	scaleInt := func(base int) int {
+		value := int(float64(base)*scale + 0.5)
+		if value < 1 {
+			value = 1
+		}
+		return value
+	}
+
+	return layoutMetrics{
+		windowWidth:  layoutBaseMetrics.windowWidth,
+		windowHeight: layoutBaseMetrics.windowHeight,
+		tableMinH:    scaleInt(layoutBaseMetrics.tableMinH),
+		tableRowH:    scaleInt(layoutBaseMetrics.tableRowH),
+		chartHeight:  scaleInt(layoutBaseMetrics.chartHeight),
+	}
+}
+
+// tableBaseColumnWidths 是排行榜各列在缩放系数为 1.0 时的宽度（逻辑像素）。
+//
+// 注意：walk 的 TableViewColumn.SetWidth 会触发内部重建列、清掉列的对齐设置，
+// 且 SetAlignment 在值未变化时会直接返回、无法补救，因此列宽只在创建时设定一次，
+// 不提供运行期调整。用户仍可拖动列边界自行调整。
+var tableBaseColumnWidths = []int{70, 200, 90, 120, 120, 100, 130}
+
+// scaledColumnWidths 依据缩放系数计算排行榜列宽。
+func scaledColumnWidths(scale float64) []int {
+	if scale <= 0 {
+		scale = 1
+	}
+
+	widths := make([]int, len(tableBaseColumnWidths))
+	for i, base := range tableBaseColumnWidths {
+		width := int(float64(base)*scale + 0.5)
+		if width < 40 {
+			width = 40
+		}
+		widths[i] = width
+	}
+	return widths
+}
+
 // App 是 CodeCounter 的主窗口。
 type App struct {
 	opts  Options
@@ -40,6 +111,10 @@ type App struct {
 	pathEdit *walk.LineEdit
 	table    *walk.TableView
 	status   *walk.StatusBarItem
+
+	// baseFont 是窗口创建时的默认字体，用于按缩放系数派生新字体，
+	// 避免在已缩放的字体上反复缩放。
+	baseFont *walk.Font
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -62,7 +137,7 @@ func Run(opts Options) error {
 		model: &leaderboardModel{},
 		chart: newBarChart(),
 	}
-	app.chart.SetOptions(cfg.ShowLanguageIcons, cfg.MaxBars)
+	app.chart.SetOptions(cfg.ShowLanguageIcons, cfg.ShowPercent, cfg.MaxBars, cfg.Scale)
 	app.ctx, app.cancel = context.WithCancel(context.Background())
 
 	if err := app.create(); err != nil {
@@ -75,7 +150,6 @@ func Run(opts Options) error {
 				loadErr.Error()+"\n\n已改用默认设置继续运行。", walk.MsgBoxIconWarning)
 		}
 		// 窗口显示后立即统计，避免界面因等待遍历而卡住
-
 		go app.scanDir(app.initialDir())
 	})
 	app.window.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
@@ -88,12 +162,15 @@ func Run(opts Options) error {
 
 // create 构建主窗口及其控件。
 func (a *App) create() error {
+	m := newLayoutMetrics(a.cfg.Scale)
+	cols := scaledColumnWidths(a.cfg.Scale)
+
 	err := decl.MainWindow{
 		AssignTo: &a.window,
 		Title:    fmt.Sprintf("CodeCounter %s", a.opts.Version),
-		MinSize:  decl.Size{Width: 880, Height: 560},
-		Size:     decl.Size{Width: 1040, Height: 720},
-		Layout:   decl.VBox{},
+		MinSize:  decl.Size{Width: 720, Height: 480},
+		Size:     decl.Size{Width: m.windowWidth, Height: m.windowHeight},
+		Layout:   decl.VBox{MarginsZero: true},
 		ToolBar: decl.ToolBar{
 			// 默认样式为仅显示图标，这里改用文字按钮
 			ButtonStyle: decl.ToolBarButtonTextOnly,
@@ -107,7 +184,7 @@ func (a *App) create() error {
 		},
 		Children: []decl.Widget{
 			decl.Composite{
-				Layout: decl.HBox{},
+				Layout: decl.HBox{MarginsZero: true},
 				Children: []decl.Widget{
 					decl.Label{Text: "统计范围:"},
 					decl.LineEdit{AssignTo: &a.pathEdit, ReadOnly: true, StretchFactor: 1},
@@ -117,8 +194,8 @@ func (a *App) create() error {
 			decl.GroupBox{
 				Title:         "排行榜",
 				Layout:        decl.VBox{},
-				MinSize:       decl.Size{Height: 180},
-				StretchFactor: 3,
+				MinSize:       decl.Size{Height: m.tableMinH},
+				StretchFactor: 1,
 				Children: []decl.Widget{
 					decl.TableView{
 						AssignTo:         &a.table,
@@ -126,14 +203,15 @@ func (a *App) create() error {
 						AlternatingRowBG: true,
 						ColumnsOrderable: false,
 						StretchFactor:    1,
+
 						Columns: []decl.TableViewColumn{
-							{Title: "排名", Width: 56, Alignment: decl.AlignFar},
-							{Title: "语言", Width: 170},
-							{Title: "文件数", Width: 84, Alignment: decl.AlignFar},
-							{Title: "代码行", Width: 100, Alignment: decl.AlignFar},
-							{Title: "注释行", Width: 100, Alignment: decl.AlignFar},
-							{Title: "空行", Width: 92, Alignment: decl.AlignFar},
-							{Title: "总行数", Width: 100, Alignment: decl.AlignFar},
+							{Title: "排名", Width: cols[0], Alignment: decl.AlignFar},
+							{Title: "语言", Width: cols[1]},
+							{Title: "文件数", Width: cols[2], Alignment: decl.AlignFar},
+							{Title: "代码行", Width: cols[3], Alignment: decl.AlignFar},
+							{Title: "注释行", Width: cols[4], Alignment: decl.AlignFar},
+							{Title: "空行", Width: cols[5], Alignment: decl.AlignFar},
+							{Title: "总行数", Width: cols[6], Alignment: decl.AlignFar},
 						},
 					},
 				},
@@ -141,8 +219,8 @@ func (a *App) create() error {
 			decl.GroupBox{
 				Title:   "代码行数分布",
 				Layout:  decl.VBox{},
-				MinSize: decl.Size{Height: 330},
-				MaxSize: decl.Size{Height: 330},
+				MinSize: decl.Size{Height: m.chartHeight},
+				MaxSize: decl.Size{Height: m.chartHeight},
 				Children: []decl.Widget{
 					decl.CustomWidget{
 						AssignTo:            &a.chart.widget,
@@ -165,7 +243,38 @@ func (a *App) create() error {
 	if icon := appIcon(); icon != nil {
 		_ = a.window.SetIcon(icon)
 	}
+
+	// 保存默认字体，作为缩放基准
+	a.baseFont = a.window.Font()
+	a.applyFontScale(a.cfg.Scale)
 	return nil
+}
+
+// applyFontScale 按缩放系数调整窗口字体。
+func (a *App) applyFontScale(scale float64) {
+	if a.window == nil || a.baseFont == nil || scale <= 0 {
+		return
+	}
+
+	pointSize := int(float64(a.baseFont.PointSize())*scale + 0.5)
+	if pointSize < 6 {
+		pointSize = 6
+	}
+
+	font, err := walk.NewFont(a.baseFont.Family(), pointSize, a.baseFont.Style())
+	if err != nil {
+		return
+	}
+	a.window.SetFont(font)
+}
+
+// applyScale 在运行期应用新的缩放系数。
+//
+// walk 不支持在运行期修改控件的 MinSize/MaxSize，表格行高也只在创建时生效，
+// 因此这里通过调整字体来同步改变文字与表格行高：
+// 表格行高会跟随控件字体自动计算，无需单独设置。
+func (a *App) applyScale(scale float64) {
+	a.applyFontScale(scale)
 }
 
 // initialDir 返回启动时应统计的目录。
@@ -271,21 +380,11 @@ func (a *App) finishScan(res *counter.Result, err error) {
 
 // chooseDir 让用户选择要统计的目录。
 func (a *App) chooseDir() {
-	dlg := walk.FileDialog{
-		Title:          "选择要统计的目录",
-		InitialDirPath: a.currentRoot(),
-	}
-
-	accepted, err := dlg.ShowBrowseFolder(a.window)
-	if err != nil {
-		a.reportError("选择目录失败", err)
+	dir, ok := chooseFolder(a.window, "选择要统计的目录", a.currentRoot())
+	if !ok {
 		return
 	}
-	if !accepted || dlg.FilePath == "" {
-		return
-	}
-
-	go a.scanDir(dlg.FilePath)
+	go a.scanDir(dir)
 }
 
 // chooseFiles 让用户选择要统计的文件。
@@ -322,28 +421,35 @@ func (a *App) rescan() {
 	go a.scanDir(root)
 }
 
-// openPrefs 打开设置对话框并把结果应用到当前会话。
+// openPrefs 打开设置对话框。
+//
+// 用户点击「应用」或「确定」时立即保存并生效，无需退出对话框。
 func (a *App) openPrefs() {
-	updated, accepted, err := showPrefs(a.window, a.opts.Version, a.currentConfig())
+	applied := false
+
+	err := showPrefs(a.window, a.opts.Version, a.currentConfig(), a.currentRoot(),
+		func(cfg config.Config) error {
+			if saveErr := cfg.Save(); saveErr != nil {
+				return saveErr
+			}
+
+			a.mu.Lock()
+			a.cfg = cfg
+			a.mu.Unlock()
+
+			a.chart.SetOptions(cfg.ShowLanguageIcons, cfg.ShowPercent, cfg.MaxBars, cfg.Scale)
+			a.applyScale(cfg.Scale)
+			applied = true
+			return nil
+		})
 	if err != nil {
-		a.reportError("打开设置失败", err)
-		return
-	}
-	if !accepted {
+		a.reportError("设置失败", err)
 		return
 	}
 
-	if err := updated.Save(); err != nil {
-		a.reportError("保存设置失败", err)
-		return
+	if applied {
+		a.rescan()
 	}
-
-	a.mu.Lock()
-	a.cfg = updated
-	a.mu.Unlock()
-
-	a.chart.SetOptions(updated.ShowLanguageIcons, updated.MaxBars)
-	a.rescan()
 }
 
 // exportJSON 把最近一次统计结果导出为 JSON 文件。

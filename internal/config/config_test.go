@@ -127,3 +127,84 @@ func TestNewMatcherDisablesRules(t *testing.T) {
 		t.Error("关闭内置名单后不应跳过 node_modules")
 	}
 }
+
+// TestDirOverride 验证可以通过环境变量覆盖配置目录。
+func TestDirOverride(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(EnvConfigDir, dir)
+
+	got, err := Dir()
+	if err != nil {
+		t.Fatalf("Dir() 返回错误: %v", err)
+	}
+	if got != dir {
+		t.Errorf("Dir() = %q, 期望 %q", got, dir)
+	}
+
+	path, err := Path()
+	if err != nil {
+		t.Fatalf("Path() 返回错误: %v", err)
+	}
+	if want := filepath.Join(dir, "config.json"); path != want {
+		t.Errorf("Path() = %q, 期望 %q", path, want)
+	}
+}
+
+// TestSaveLoadRoundTrip 验证配置可以完整保存并读回。
+func TestSaveLoadRoundTrip(t *testing.T) {
+	t.Setenv(EnvConfigDir, t.TempDir())
+
+	want := Defaults()
+	want.DefaultDirMode = DirModeFixed
+	want.FixedDir = "D:\\示例目录"
+	want.UseDefaultExcludes = false
+	want.CustomExcludes = []string{"*.min.js", "docs/"}
+	want.ShowLanguageIcons = false
+	want.MaxBars = 30
+
+	if err := want.Save(); err != nil {
+		t.Fatalf("Save() 返回错误: %v", err)
+	}
+
+	got, err := Load()
+	if err != nil {
+		t.Fatalf("Load() 返回错误: %v", err)
+	}
+
+	if got.DefaultDirMode != want.DefaultDirMode || got.FixedDir != want.FixedDir {
+		t.Errorf("目录策略未正确保存: %+v", got)
+	}
+	if got.UseDefaultExcludes != want.UseDefaultExcludes || got.UseGitIgnore != want.UseGitIgnore {
+		t.Errorf("排除开关未正确保存: %+v", got)
+	}
+	if len(got.CustomExcludes) != 2 || got.CustomExcludes[0] != "*.min.js" {
+		t.Errorf("自定义规则未正确保存: %v", got.CustomExcludes)
+	}
+	if got.ShowLanguageIcons != want.ShowLanguageIcons || got.MaxBars != want.MaxBars {
+		t.Errorf("显示选项未正确保存: %+v", got)
+	}
+}
+
+// TestNormalizeScale 验证缩放系数会被限制在合理区间。
+func TestNormalizeScale(t *testing.T) {
+	cases := []struct {
+		in   float64
+		want float64
+	}{
+		{0, Defaults().Scale},
+		{0.1, Defaults().Scale},
+		{0.8, 0.8},
+		{1.25, 1.25},
+		{1.6, 1.6},
+		{5, Defaults().Scale},
+	}
+
+	for _, c := range cases {
+		cfg := Defaults()
+		cfg.Scale = c.in
+		cfg.Normalize()
+		if cfg.Scale != c.want {
+			t.Errorf("Scale=%v 归一化后 = %v, 期望 %v", c.in, cfg.Scale, c.want)
+		}
+	}
+}

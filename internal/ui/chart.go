@@ -9,17 +9,61 @@ import (
 	"github.com/linfunss/codecounter/internal/format"
 )
 
-// 条形图的布局常量，单位是与 DPI 无关的逻辑像素。
-// 实际绘制时会统一换算为物理像素，因此只使用 walk 的 *Pixels 系列方法。
-const (
-	chartPadding    = 12
-	chartRowHeight  = 30
-	chartBadgeSize  = 20
-	chartNameWidth  = 150
-	chartValueWidth = 96
-	chartGap        = 10
-	chartRadius     = 4
-)
+// chartBaseMetrics 是缩放系数为 1.0 时的条形图尺寸，单位是与 DPI 无关的逻辑像素。
+// 取值偏紧凑，避免出现大片空白。
+var chartBaseMetrics = struct {
+	padding    int
+	rowHeight  int
+	badgeSize  int
+	nameWidth  int
+	valueWidth int
+	gap        int
+	radius     int
+}{
+	padding:    8,
+	rowHeight:  26,
+	badgeSize:  18,
+	nameWidth:  128,
+	valueWidth: 142, // 需要容纳「1,234 (45.2%)」
+	gap:        8,
+	radius:     4,
+}
+
+// chartMetrics 是按当前缩放系数换算后的尺寸。
+type chartMetrics struct {
+	padding    int
+	rowHeight  int
+	badgeSize  int
+	nameWidth  int
+	valueWidth int
+	gap        int
+	radius     int
+}
+
+// newChartMetrics 依据缩放系数计算布局尺寸。
+func newChartMetrics(scale float64) chartMetrics {
+	if scale <= 0 {
+		scale = 1
+	}
+
+	scaleInt := func(base int) int {
+		value := int(float64(base)*scale + 0.5)
+		if value < 1 {
+			value = 1
+		}
+		return value
+	}
+
+	return chartMetrics{
+		padding:    scaleInt(chartBaseMetrics.padding),
+		rowHeight:  scaleInt(chartBaseMetrics.rowHeight),
+		badgeSize:  scaleInt(chartBaseMetrics.badgeSize),
+		nameWidth:  scaleInt(chartBaseMetrics.nameWidth),
+		valueWidth: scaleInt(chartBaseMetrics.valueWidth),
+		gap:        scaleInt(chartBaseMetrics.gap),
+		radius:     scaleInt(chartBaseMetrics.radius),
+	}
+}
 
 // barChart 负责在自定义控件上绘制语言代码行数条形图。
 type barChart struct {
@@ -28,13 +72,17 @@ type barChart struct {
 
 	// showIcons 控制是否绘制语言图标。
 	showIcons bool
+	// showPercent 控制是否显示代码行数占比。
+	showPercent bool
 	// maxBars 是图表最多显示的语言数量，0 表示不限。
 	maxBars int
+	// scale 是界面缩放系数。
+	scale float64
 }
 
 // newBarChart 创建一个尚未绑定控件的条形图。
 func newBarChart() *barChart {
-	return &barChart{showIcons: true}
+	return &barChart{showIcons: true, showPercent: true, scale: 1}
 }
 
 // SetRows 更新数据并触发重绘。
@@ -44,9 +92,11 @@ func (c *barChart) SetRows(rows []counter.LanguageStat) {
 }
 
 // SetOptions 更新显示选项并触发重绘。
-func (c *barChart) SetOptions(showIcons bool, maxBars int) {
+func (c *barChart) SetOptions(showIcons, showPercent bool, maxBars int, scale float64) {
 	c.showIcons = showIcons
+	c.showPercent = showPercent
 	c.maxBars = maxBars
+	c.scale = scale
 	c.invalidate()
 }
 
@@ -68,6 +118,7 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 		bounds = walk.Rectangle{Width: wb.Width, Height: wb.Height}
 	}
 
+	m := newChartMetrics(c.scale)
 	dpi := canvas.DPI()
 
 	background, err := walk.NewSolidColorBrush(walk.RGB(0xFF, 0xFF, 0xFF))
@@ -86,31 +137,35 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 			walk.TextCenter|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix)
 	}
 
-	rows, hidden := c.visibleRows(bounds)
+	rows, hidden := c.visibleRows(bounds, m)
 	if len(rows) == 0 {
 		return nil
 	}
 
 	maxCode := int64(1)
+	totalCode := int64(0)
+	for _, r := range c.rows {
+		totalCode += r.Code
+	}
 	for _, r := range rows {
 		if r.Code > maxCode {
 			maxCode = r.Code
 		}
 	}
 
-	layout := newChartLayout(bounds, c.showIcons)
+	layout := newChartLayout(bounds, c.showIcons, m)
 	for i, r := range rows {
-		if err := c.paintRow(canvas, layout, i, r, maxCode); err != nil {
+		if err := c.paintRow(canvas, layout, m, i, r, maxCode, totalCode); err != nil {
 			return err
 		}
 	}
 
 	if hidden > 0 {
 		rect := walk.Rectangle{
-			X:      chartPadding,
-			Y:      chartPadding + len(rows)*chartRowHeight,
-			Width:  bounds.Width - chartPadding*2,
-			Height: chartRowHeight,
+			X:      m.padding,
+			Y:      m.padding + len(rows)*m.rowHeight,
+			Width:  bounds.Width - m.padding*2,
+			Height: m.rowHeight,
 		}
 		text := fmt.Sprintf("…… 其余 %d 种语言未在图中显示，完整数据见上方排行榜", hidden)
 		if err := c.drawText(canvas, text, walk.RGB(0x8A, 0x8A, 0x8A), rect,
@@ -123,8 +178,8 @@ func (c *barChart) paint(canvas *walk.Canvas, _ walk.Rectangle) error {
 }
 
 // drawText 按逻辑坐标绘制文本，内部换算为物理像素。
-func (c *barChart) drawText(canvas *walk.Canvas, text string, color walk.Color, bounds walk.Rectangle, format walk.DrawTextFormat) error {
-	return canvas.DrawTextPixels(text, c.font(), color, walk.RectangleFrom96DPI(bounds, canvas.DPI()), format)
+func (c *barChart) drawText(canvas *walk.Canvas, text string, color walk.Color, bounds walk.Rectangle, textFormat walk.DrawTextFormat) error {
+	return canvas.DrawTextPixels(text, c.font(), color, walk.RectangleFrom96DPI(bounds, canvas.DPI()), textFormat)
 }
 
 // fillRounded 按逻辑坐标填充圆角矩形，内部换算为物理像素。
@@ -136,14 +191,14 @@ func (c *barChart) fillRounded(canvas *walk.Canvas, brush walk.Brush, bounds wal
 }
 
 // paintBadge 绘制自绘的语言徽章，用于没有内置图标的语言。
-func (c *barChart) paintBadge(canvas *walk.Canvas, bounds walk.Rectangle, mark badge) error {
+func (c *barChart) paintBadge(canvas *walk.Canvas, m chartMetrics, bounds walk.Rectangle, mark badge) error {
 	brush, err := walk.NewSolidColorBrush(mark.color)
 	if err != nil {
 		return err
 	}
 	defer brush.Dispose()
 
-	if err := c.fillRounded(canvas, brush, bounds, chartRadius+2); err != nil {
+	if err := c.fillRounded(canvas, brush, bounds, m.radius+2); err != nil {
 		return err
 	}
 
@@ -152,15 +207,15 @@ func (c *barChart) paintBadge(canvas *walk.Canvas, bounds walk.Rectangle, mark b
 }
 
 // paintRow 绘制单行：图标、语言名、条形与数值。
-func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, stat counter.LanguageStat, maxCode int64) error {
+func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, m chartMetrics, index int, stat counter.LanguageStat, maxCode, totalCode int64) error {
 	mark := languageBadge(stat.Language)
 
-	y := chartPadding + index*chartRowHeight
+	y := m.padding + index*m.rowHeight
 
 	if layout.badgeSize > 0 {
-		centerY := y + (chartRowHeight-layout.badgeSize)/2
+		centerY := y + (m.rowHeight-layout.badgeSize)/2
 		badgeRect := walk.Rectangle{
-			X:      chartPadding,
+			X:      m.padding,
 			Y:      centerY,
 			Width:  layout.badgeSize,
 			Height: layout.badgeSize,
@@ -172,7 +227,7 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 			if err := canvas.DrawImageStretchedPixels(logo, pixelRect); err != nil {
 				return err
 			}
-		} else if err := c.paintBadge(canvas, badgeRect, mark); err != nil {
+		} else if err := c.paintBadge(canvas, m, badgeRect, mark); err != nil {
 			return err
 		}
 	}
@@ -181,18 +236,22 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 		X:      layout.nameX,
 		Y:      y,
 		Width:  layout.nameWidth,
-		Height: chartRowHeight,
+		Height: m.rowHeight,
 	}
 	if err := c.drawText(canvas, stat.Language, walk.RGB(0x1F, 0x1F, 0x1F), nameRect,
 		walk.TextVCenter|walk.TextSingleLine|walk.TextEndEllipsis|walk.TextNoPrefix); err != nil {
 		return err
 	}
 
+	barHeight := m.rowHeight - m.gap*2
+	if barHeight < 4 {
+		barHeight = 4
+	}
 	trackRect := walk.Rectangle{
 		X:      layout.barX,
-		Y:      y + 8,
+		Y:      y + (m.rowHeight-barHeight)/2,
 		Width:  layout.barWidth,
-		Height: chartRowHeight - 16,
+		Height: barHeight,
 	}
 	track, err := walk.NewSolidColorBrush(walk.RGB(0xEC, 0xEC, 0xEC))
 	if err != nil {
@@ -200,7 +259,7 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 	}
 	defer track.Dispose()
 
-	if err := c.fillRounded(canvas, track, trackRect, chartRadius); err != nil {
+	if err := c.fillRounded(canvas, track, trackRect, m.radius); err != nil {
 		return err
 	}
 
@@ -212,29 +271,38 @@ func (c *barChart) paintRow(canvas *walk.Canvas, layout chartLayout, index int, 
 		}
 		defer value.Dispose()
 
-		if err := c.fillRounded(canvas, value, valueRect, chartRadius); err != nil {
+		if err := c.fillRounded(canvas, value, valueRect, m.radius); err != nil {
 			return err
 		}
 	}
 
 	numberRect := walk.Rectangle{
-		X:      layout.barX + layout.barWidth + chartGap,
+		X:      layout.barX + layout.barWidth + m.gap,
 		Y:      y,
 		Width:  layout.valueWidth,
-		Height: chartRowHeight,
+		Height: m.rowHeight,
 	}
-	return c.drawText(canvas, format.Int(stat.Code), walk.RGB(0x1F, 0x1F, 0x1F), numberRect,
+	return c.drawText(canvas, chartValueText(stat.Code, totalCode, c.showPercent),
+		walk.RGB(0x1F, 0x1F, 0x1F), numberRect,
 		walk.TextRight|walk.TextVCenter|walk.TextSingleLine|walk.TextNoPrefix)
 }
 
+// chartValueText 组合条形图右侧的数值与占比。
+func chartValueText(code, total int64, showPercent bool) string {
+	if !showPercent || total <= 0 {
+		return format.Int(code)
+	}
+	return fmt.Sprintf("%s (%.1f%%)", format.Int(code), float64(code)/float64(total)*100)
+}
+
 // visibleRows 返回当前显示选项与尺寸下能显示的行，以及未显示的行数。
-func (c *barChart) visibleRows(bounds walk.Rectangle) ([]counter.LanguageStat, int) {
+func (c *barChart) visibleRows(bounds walk.Rectangle, m chartMetrics) ([]counter.LanguageStat, int) {
 	rows := c.rows
 	if c.maxBars > 0 && len(rows) > c.maxBars {
 		rows = rows[:c.maxBars]
 	}
 
-	maxRows := (bounds.Height - chartPadding*2) / chartRowHeight
+	maxRows := (bounds.Height - m.padding*2) / m.rowHeight
 	if maxRows < 1 {
 		maxRows = 1
 	}
@@ -269,36 +337,37 @@ type chartLayout struct {
 }
 
 // newChartLayout 依据可用宽度计算各列位置，窗口过窄时自动压缩语言名宽度。
-func newChartLayout(bounds walk.Rectangle, showIcons bool) chartLayout {
+func newChartLayout(bounds walk.Rectangle, showIcons bool, m chartMetrics) chartLayout {
 	badgeSize := 0
 	iconWidth := 0
 	if showIcons {
-		badgeSize = chartBadgeSize
-		iconWidth = chartBadgeSize + chartGap
+		badgeSize = m.badgeSize
+		iconWidth = m.badgeSize + m.gap
 	}
 
-	nameX := chartPadding + iconWidth
+	nameX := m.padding + iconWidth
 
-	nameWidth := chartNameWidth
+	// 语言名最多占可用宽度的四分之一，避免挤掉条形图
+	nameWidth := m.nameWidth
 	if limit := (bounds.Width - iconWidth) / 4; nameWidth > limit {
 		nameWidth = limit
 	}
-	if nameWidth < 60 {
-		nameWidth = 60
+	if nameWidth < m.gap*5 {
+		nameWidth = m.gap * 5
 	}
 
-	barX := func(width int) int { return nameX + width + chartGap }
+	barX := func(width int) int { return nameX + width + m.gap }
 
-	barWidth := bounds.Width - barX(nameWidth) - chartValueWidth - chartPadding
-	if barWidth < 60 {
-		nameWidth -= 60 - barWidth
-		if nameWidth < 60 {
-			nameWidth = 60
+	barWidth := bounds.Width - barX(nameWidth) - m.valueWidth - m.padding
+	if barWidth < m.gap*5 {
+		nameWidth -= m.gap*5 - barWidth
+		if nameWidth < m.gap*5 {
+			nameWidth = m.gap * 5
 		}
-		barWidth = bounds.Width - barX(nameWidth) - chartValueWidth - chartPadding
+		barWidth = bounds.Width - barX(nameWidth) - m.valueWidth - m.padding
 	}
-	if barWidth < 20 {
-		barWidth = 20
+	if barWidth < m.gap*2 {
+		barWidth = m.gap * 2
 	}
 
 	return chartLayout{
@@ -307,7 +376,7 @@ func newChartLayout(bounds walk.Rectangle, showIcons bool) chartLayout {
 		nameWidth:  nameWidth,
 		barX:       barX(nameWidth),
 		barWidth:   barWidth,
-		valueWidth: chartValueWidth,
+		valueWidth: m.valueWidth,
 	}
 }
 
