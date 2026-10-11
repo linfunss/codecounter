@@ -7,6 +7,10 @@
 
 ## [未发布]
 
+暂无。
+
+## [0.2.3] - 2026-10-12
+
 ### 优化
 
 - 统一界面字体：优先使用「Microsoft YaHei UI」，其次「Microsoft YaHei」「Segoe UI」，
@@ -114,6 +118,7 @@
 
 - 界面依赖 `lxn/walk`，因此本项目仅支持 Windows
 
-[未发布]: https://github.com/linfunss/codecounter/compare/v0.2.0...HEAD
+[未发布]: https://github.com/linfunss/codecounter/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/linfunss/codecounter/releases/tag/v0.2.3
 [0.2.0]: https://github.com/linfunss/codecounter/releases/tag/v0.2.0
 [0.1.0]: https://github.com/linfunss/codecounter/releases/tag/v0.1.0
