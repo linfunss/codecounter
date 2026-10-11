@@ -65,6 +65,16 @@ type prefsDialog struct {
 	cancelButton *walk.PushButton
 }
 
+// pageLayout 返回标签页统一使用的内容布局。
+//
+// 标签页自身没有内边距，这里补上与主窗口一致的留白，让设置项、
+// 说明文字与分组框之间保持同样的边距；关于页也因此与边框留出间距。
+func pageLayout() decl.VBox {
+	return decl.VBox{Margins: decl.Margins{
+		Left: uiTabMargin, Right: uiTabMargin, Top: uiTabMargin, Bottom: uiTabMargin,
+	}}
+}
+
 // showPrefs 打开设置对话框。
 //
 // 用户在对话框中点击「应用」或「确定」时，apply 会立即被调用，
@@ -106,7 +116,10 @@ func (p *prefsDialog) create() error {
 		Font:     decl.Font{Family: ownerFont.Family(), PointSize: ownerFont.PointSize()},
 		MinSize:  decl.Size{Width: 560, Height: 350},
 		Size:     decl.Size{Width: 600, Height: 420},
-		Layout:   decl.VBox{MarginsZero: true},
+		// 与主窗口使用同一组内边距，保证两个窗口的内容左边距一致
+		Layout: decl.VBox{Margins: decl.Margins{
+			Left: uiMarginH, Right: uiMarginH, Top: uiMarginV, Bottom: uiMarginV,
+		}},
 		Children: []decl.Widget{
 			decl.TabWidget{
 				Pages: []decl.TabPage{
@@ -121,7 +134,7 @@ func (p *prefsDialog) create() error {
 				Layout: decl.VBox{},
 				Children: []decl.Widget{
 					decl.Composite{
-						Layout: decl.HBox{},
+						Layout: decl.HBox{MarginsZero: true},
 						Children: []decl.Widget{
 							decl.Label{Text: "路径:"},
 							decl.LineEdit{Text: configPath, ReadOnly: true, StretchFactor: 1},
@@ -131,7 +144,7 @@ func (p *prefsDialog) create() error {
 				},
 			},
 			decl.Composite{
-				Layout: decl.HBox{},
+				Layout: decl.HBox{MarginsZero: true},
 				Children: []decl.Widget{
 					decl.PushButton{Text: "恢复默认", OnClicked: p.restoreDefaults},
 					decl.HSpacer{},
@@ -168,10 +181,10 @@ func (p *prefsDialog) create() error {
 func (p *prefsDialog) generalPage() decl.TabPage {
 	return decl.TabPage{
 		Title:  "通用",
-		Layout: decl.VBox{},
+		Layout: pageLayout(),
 		Children: []decl.Widget{
 			decl.Composite{
-				Layout: decl.HBox{},
+				Layout: decl.HBox{MarginsZero: true},
 				Children: []decl.Widget{
 					decl.Label{Text: "默认统计目录:"},
 					decl.ComboBox{
@@ -183,7 +196,7 @@ func (p *prefsDialog) generalPage() decl.TabPage {
 				},
 			},
 			decl.Composite{
-				Layout: decl.HBox{},
+				Layout: decl.HBox{MarginsZero: true},
 				Children: []decl.Widget{
 					decl.Label{Text: "固定目录:"},
 					decl.LineEdit{AssignTo: &p.fixedDirEdit, StretchFactor: 1},
@@ -201,7 +214,7 @@ func (p *prefsDialog) generalPage() decl.TabPage {
 func (p *prefsDialog) excludePage() decl.TabPage {
 	return decl.TabPage{
 		Title:  "排除规则",
-		Layout: decl.VBox{},
+		Layout: pageLayout(),
 		Children: []decl.Widget{
 			decl.CheckBox{
 				AssignTo:  &p.useDefaultsCheck,
@@ -231,7 +244,7 @@ func (p *prefsDialog) excludePage() decl.TabPage {
 				StretchFactor: 1,
 				Children: []decl.Widget{
 					decl.Composite{
-						Layout: decl.HBox{},
+						Layout: decl.HBox{MarginsZero: true},
 						Children: []decl.Widget{
 							decl.PushButton{Text: "添加文件…", OnClicked: p.addExcludeFile},
 							decl.PushButton{Text: "添加文件夹…", OnClicked: p.addExcludeFolder},
@@ -261,7 +274,7 @@ func (p *prefsDialog) excludePage() decl.TabPage {
 func (p *prefsDialog) displayPage() decl.TabPage {
 	return decl.TabPage{
 		Title:  "显示",
-		Layout: decl.VBox{},
+		Layout: pageLayout(),
 		Children: []decl.Widget{
 			decl.CheckBox{
 				AssignTo:  &p.showIconsCheck,
@@ -275,7 +288,7 @@ func (p *prefsDialog) displayPage() decl.TabPage {
 			},
 
 			decl.Composite{
-				Layout: decl.HBox{},
+				Layout: decl.HBox{MarginsZero: true},
 				Children: []decl.Widget{
 					decl.Label{Text: "界面缩放:"},
 					decl.ComboBox{AssignTo: &p.scaleCombo, Model: scaleLabels},
@@ -292,7 +305,7 @@ func (p *prefsDialog) displayPage() decl.TabPage {
 func (p *prefsDialog) aboutPage() decl.TabPage {
 	return decl.TabPage{
 		Title:  "关于",
-		Layout: decl.VBox{},
+		Layout: pageLayout(),
 		Children: []decl.Widget{
 			decl.Label{Text: fmt.Sprintf("CodeCounter %s", p.version)},
 			decl.Label{Text: "统计项目代码行数的 Windows 原生小工具。"},

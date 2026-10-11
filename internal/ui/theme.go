@@ -12,6 +12,20 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+// 界面统一内边距（96 DPI 逻辑像素）。
+//
+// 主窗口与设置对话框共用同一组数值，让两类窗口的内容左边距一致；
+// 数值比 walk 默认的 9 稍大，给内容与窗口边框之间留出呼吸空间。
+const (
+	// uiMarginH 是顶层内容区与窗口边框之间的左右内边距。
+	uiMarginH = 14
+	// uiMarginV 是顶层内容区与窗口边框之间的上下内边距。
+	uiMarginV = 8
+	// uiTabMargin 是设置标签页内容与标签框之间的内边距，
+	// 取值比顶层略小，因为标签框本身已经带了一圈留白。
+	uiTabMargin = 12
+)
+
 // uiBasePointSize 是缩放系数为 1.0 时的界面字号（磅）。
 //
 // 9pt 与简体中文版 Windows 10 的默认 UI 字号一致，比 walk 内置的
