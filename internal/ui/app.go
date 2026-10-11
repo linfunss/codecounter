@@ -110,10 +110,6 @@ type App struct {
 	table    *walk.TableView
 	status   *walk.StatusBarItem
 
-	// baseFont 是窗口创建时的默认字体，用于按缩放系数派生新字体，
-	// 避免在已缩放的字体上反复缩放。
-	baseFont *walk.Font
-
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -166,9 +162,12 @@ func (a *App) create() error {
 	err := decl.MainWindow{
 		AssignTo: &a.window,
 		Title:    fmt.Sprintf("CodeCounter %s", a.opts.Version),
-		MinSize:  decl.Size{Width: 720, Height: 480},
-		Size:     decl.Size{Width: m.windowWidth, Height: m.windowHeight},
-		Layout:   decl.VBox{MarginsZero: true},
+		// 显式指定界面字体：默认的「MS Shell Dlg 2」在中文系统上会让汉字
+		// 回退到细笔画字体，与数字的粗细不一致。
+		Font:    decl.Font{Family: uiFontFamily(), PointSize: scaledPointSize(a.cfg.Scale)},
+		MinSize: decl.Size{Width: 720, Height: 480},
+		Size:    decl.Size{Width: m.windowWidth, Height: m.windowHeight},
+		Layout:  decl.VBox{MarginsZero: true},
 
 		ToolBar: decl.ToolBar{ButtonStyle: decl.ToolBarButtonTextOnly, Items: []decl.MenuItem{
 			decl.Action{Text: "选择目录", OnTriggered: a.chooseDir},
@@ -245,8 +244,9 @@ func (a *App) create() error {
 		_ = a.window.SetIcon(icon)
 	}
 
-	// 保存默认字体，作为缩放基准
-	a.baseFont = a.window.Font()
+	// 关闭 Windows 11 的圆角窗框，回到 Windows 10 的直角外观
+	useWindows10WindowFrame(a.window.Handle())
+
 	a.applyFontScale(a.cfg.Scale)
 	a.table.SizeChanged().Attach(a.fitColumns)
 	a.fitColumns()
@@ -255,19 +255,15 @@ func (a *App) create() error {
 
 // applyFontScale 按缩放系数调整窗口字体。
 func (a *App) applyFontScale(scale float64) {
-	if a.window == nil || a.baseFont == nil || scale <= 0 {
+	if a.window == nil {
 		return
 	}
 
-	pointSize := int(float64(a.baseFont.PointSize()+1)*scale + 0.5)
-	if pointSize < 6 {
-		pointSize = 6
-	}
-
-	font, err := walk.NewFont(a.baseFont.Family(), pointSize, a.baseFont.Style())
-	if err != nil {
+	font := newUIFont(scale)
+	if font == nil {
 		return
 	}
+
 	a.window.SetFont(font)
 	_ = a.window.ToolBar().SetDefaultButtonWidth(int(100 * scale))
 }
