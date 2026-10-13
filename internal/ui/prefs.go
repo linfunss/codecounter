@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 
 	"github.com/lxn/walk"
 	decl "github.com/lxn/walk/declarative"
+	"github.com/lxn/win"
 
 	"github.com/linfunss/codecounter/internal/config"
 	"github.com/linfunss/codecounter/internal/ignore"
@@ -34,6 +36,9 @@ var scaleLabels = []string{"80%", "90%", "100%", "110%", "125%", "150%"}
 
 // scaleValues 与 scaleLabels 一一对应。
 var scaleValues = []float64{0.8, 0.9, 1.0, 1.1, 1.25, 1.5}
+
+// repoURL 是项目仓库地址，关于页展示并允许点击跳转。
+const repoURL = "https://github.com/linfunss/codecounter"
 
 // prefsDialog 是设置对话框，负责展示配置项并在用户确认时回传新配置。
 type prefsDialog struct {
@@ -63,6 +68,8 @@ type prefsDialog struct {
 	saved        config.Config
 	okButton     *walk.PushButton
 	cancelButton *walk.PushButton
+	repoLink     *walk.LinkLabel
+	logoView     *walk.ImageView
 }
 
 // pageLayout 返回标签页统一使用的内容布局。
@@ -173,6 +180,9 @@ func (p *prefsDialog) create() error {
 	useWindows10WindowFrame(p.dlg.Handle())
 	if icon := appIcon(); icon != nil {
 		_ = p.dlg.SetIcon(icon)
+	}
+	if logo := appLogo(); logo != nil && p.logoView != nil {
+		_ = p.logoView.SetImage(logo)
 	}
 	return nil
 }
@@ -307,9 +317,19 @@ func (p *prefsDialog) aboutPage() decl.TabPage {
 		Title:  "关于",
 		Layout: pageLayout(),
 		Children: []decl.Widget{
+			decl.ImageView{
+				AssignTo:  &p.logoView,
+				Mode:      decl.ImageViewModeIdeal,
+				Alignment: decl.AlignHNearVNear,
+			},
 			decl.Label{Text: fmt.Sprintf("CodeCounter %s", p.version)},
 			decl.Label{Text: "统计项目代码行数的 Windows 原生小工具。"},
-			decl.Label{Text: "项目地址: https://github.com/linfunss/codecounter"},
+			decl.LinkLabel{
+				Alignment:       decl.AlignHNearVCenter,
+				AssignTo:        &p.repoLink,
+				Text:            fmt.Sprintf("项目地址: <a href=\"%s\">%s</a>", repoURL, repoURL),
+				OnLinkActivated: p.openRepoLink,
+			},
 			decl.Label{Text: "许可证: MIT"},
 			decl.VSpacer{},
 		},
@@ -584,6 +604,18 @@ func indexOfScale(value float64) int {
 		}
 	}
 	return 2
+}
+
+// openRepoLink 用系统默认浏览器打开关于页中的仓库链接。
+func (p *prefsDialog) openRepoLink(link *walk.LinkLabelLink) {
+	url := link.URL()
+	if url == "" {
+		return
+	}
+
+	if !win.ShellExecute(0, syscall.StringToUTF16Ptr("open"), syscall.StringToUTF16Ptr(url), nil, nil, win.SW_SHOWNORMAL) {
+		walk.MsgBox(p.dlg, "打开链接失败", "无法打开 "+url, walk.MsgBoxIconError)
+	}
 }
 
 // splitRuleLines 把多行文本拆分为规则列表，忽略空行。

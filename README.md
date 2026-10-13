@@ -8,9 +8,20 @@
 `node_modules`、`.idea` 等冗余内容，并以「排行榜 + 条形图 + 语言图标」
 直观展示各语言的代码量。
 
+## Logo
+
+<p align="center">
+  <a href="docs/logo/code-counter-logo.svg">
+    <img src="docs/logo/code-counter-logo.png" alt="CodeCounter Logo" width="420">
+  </a>
+</p>
+
+Logo 同时提供透明 PNG 与 SVG 矢量版本。桌面程序使用 PNG 嵌入
+「关于」页和应用图标；SVG 作为可缩放的源文件保留。
+
 ![主界面与设置界面](docs/images/screenshot.png)
 
-左为主界面，右为错开叠放的设置对话框（「排除规则」页）。
+左为主界面，右为错开叠放的设置对话框（「关于」页，含应用 Logo）。
 
 > 界面使用 Win32 原生控件（`lxn/walk`），不依赖 WebView，跟随系统主题，支持高 DPI。
 
@@ -36,7 +47,7 @@
 | 通用 | 默认统计目录策略（启动时工作目录 / 上一次使用 / 固定目录） |
 | 排除规则 | 内置名单开关与完整清单、`.gitignore` 开关、自定义规则编辑，可直接「添加文件 / 添加文件夹」生成规则 |
 | 显示 | 语言图标开关、占比开关、条形图显示数量上限、界面缩放 |
-| 关于 | 版本、项目地址与许可证 |
+| 关于 | 应用 Logo、版本、项目地址与许可证 |
 
 配置保存在 `%APPDATA%\CodeCounter\config.json`，可在对话框底部打开所在
 文件夹，或一键恢复默认设置。勾选「应用」按钮可以保存并立即生效，无需关闭

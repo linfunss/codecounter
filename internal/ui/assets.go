@@ -27,6 +27,12 @@ const iconDPI = 96
 //go:embed assets/icon.png
 var appIconPNG []byte
 
+// appLogoPNG 是「关于」页展示的完整 Logo 透明 PNG。
+// lxn/walk 基于 Win32/GDI，不能直接渲染 SVG，因此运行时使用 PNG 版本。
+//
+//go:embed assets/logo.png
+var appLogoPNG []byte
+
 // languageLogoFiles 把 scc 输出的语言名映射到内置图标文件名。
 // 未收录的语言会在界面上回退为自绘的品牌色徽章。
 var languageLogoFiles = map[string]string{
@@ -74,6 +80,9 @@ var (
 var (
 	appIconOnce sync.Once
 	appIconVal  *walk.Icon
+
+	appLogoOnce sync.Once
+	appLogoVal  *walk.Bitmap
 )
 
 // appIcon 返回应用图标，加载失败时返回 nil。
@@ -90,6 +99,22 @@ func appIcon() *walk.Icon {
 		appIconVal = icon
 	})
 	return appIconVal
+}
+
+// appLogo 返回「关于」页使用的完整 Logo 位图，加载失败时返回 nil。
+func appLogo() *walk.Bitmap {
+	appLogoOnce.Do(func() {
+		img, err := png.Decode(bytes.NewReader(appLogoPNG))
+		if err != nil {
+			return
+		}
+		bmp, err := walk.NewBitmapFromImageForDPI(img, iconDPI)
+		if err != nil {
+			return
+		}
+		appLogoVal = bmp
+	})
+	return appLogoVal
 }
 
 // languageLogo 返回语言对应的图标位图。

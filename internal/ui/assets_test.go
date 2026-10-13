@@ -50,3 +50,10 @@ func TestLanguageLogoUnknown(t *testing.T) {
 		t.Error("未收录的语言应返回 nil")
 	}
 }
+
+// TestAppLogoAsset 验证「关于」页内嵌的完整 Logo 是有效 PNG。
+func TestAppLogoAsset(t *testing.T) {
+	if _, err := png.Decode(bytes.NewReader(appLogoPNG)); err != nil {
+		t.Fatalf("关于页 Logo 不是有效的 PNG: %v", err)
+	}
+}

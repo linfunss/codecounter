@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CodeCounter Logo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #050505;
+      --paper: #f6f3eb;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: clamp(18px, 4vw, 56px);
+      background:
+        radial-gradient(circle at 50% 28%, #fffdf8 0, var(--paper) 62%, #ebe6da 100%);
+      font-family: "Segoe UI", sans-serif;
+    }
+
+    .logo-card {
+      width: min(1180px, 96vw);
+      filter: drop-shadow(0 18px 28px rgb(0 0 0 / 8%));
+    }
+
+    .logo {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .outline {
+      fill: none;
+      stroke: var(--ink);
+      stroke-width: 18;
+      stroke-linecap: square;
+      stroke-linejoin: miter;
+    }
+
+    .display {
+      fill: var(--ink);
+    }
+
+    .kline-outline {
+      fill: none;
+      stroke: var(--ink);
+      stroke-width: 18;
+      stroke-linecap: square;
+      stroke-linejoin: miter;
+    }
+
+    .kline-solid {
+      fill: var(--ink);
+      stroke: var(--ink);
+      stroke-width: 18;
+      stroke-linecap: square;
+      stroke-linejoin: miter;
+    }
+
+    .wordmark {
+      fill: #000;
+      font-family: "Arial Black", "Arial Bold", Arial, sans-serif;
+      font-size: 116px;
+      font-weight: 900;
+      letter-spacing: -1px;
+    }
+  </style>
+</head>
+<body>
+  <main class="logo-card" aria-label="CodeCounter 标志">
+    <svg class="logo"
+         viewBox="0 0 1200 720"
+         role="img"
+         aria-labelledby="logo-title logo-desc"
+         xmlns="http://www.w3.org/2000/svg">
+      <title id="logo-title">CodeCounter</title>
+      <desc id="logo-desc">全部由直角图形组成的 CodeCounter 标志，中央以负空间镂空 CODE COUNTER，下方两条 K 线式矩形与中央黑底左边线对齐。</desc>
+
+      <defs>
+        <!-- 黑色文字遮住白色蒙版，令 CODE COUNTER 成为透明镂空字。 -->
+        <mask id="wordmark-cutout"
+              maskUnits="userSpaceOnUse"
+              maskContentUnits="userSpaceOnUse"
+              x="110" y="88" width="980" height="270">
+          <rect x="110" y="88" width="980" height="270" fill="#fff"/>
+          <text class="wordmark"
+                x="600"
+                y="270"
+                text-anchor="middle"
+                dominant-baseline="middle"
+                textLength="832"
+                lengthAdjust="spacingAndGlyphs">CODE COUNTER</text>
+        </mask>
+      </defs>
+
+      <!-- 外框：全部直角。 -->
+      <rect class="outline" x="52" y="52" width="1096" height="616"/>
+
+      <!-- 中央显示条：顶部加高，左边线为 x=118。 -->
+      <rect class="display"
+            x="118" y="96"
+            width="964" height="252"
+            mask="url(#wordmark-cutout)"/>
+
+      <!-- 上方：左外缘对齐 x=118；较长、空心描边。 -->
+      <path class="kline-outline"
+            d="M127 421H177V390H737V421H787V450H737V480H177V450H127Z"/>
+
+      <!-- 下方：左外缘同样对齐 x=118；较短、实心。 -->
+      <path class="kline-solid"
+            d="M117 542H177V520H557V542H617V562H557V584H177V562H117Z"/>
+    </svg>
+  </main>
+</body>
+</html>

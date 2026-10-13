@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1200 720"
+     width="1200"
+     height="720"
+     role="img"
+     aria-labelledby="logo-title logo-desc">
+  <title id="logo-title">CodeCounter</title>
+  <desc id="logo-desc">透明底的 CodeCounter 黑色矢量标志，中央以负空间镂空 CODE COUNTER，下方两条 K 线式矩形左对齐。</desc>
+
+  <defs>
+    <mask id="wordmark-cutout"
+          maskUnits="userSpaceOnUse"
+          maskContentUnits="userSpaceOnUse"
+          x="110" y="88" width="980" height="270">
+      <rect x="110" y="88" width="980" height="270" fill="#fff"/>
+      <text x="600"
+            y="270"
+            fill="#000"
+            font-family="Arial Black, Arial Bold, Arial, sans-serif"
+            font-size="116"
+            font-weight="900"
+            letter-spacing="-1"
+            text-anchor="middle"
+            dominant-baseline="middle"
+            textLength="832"
+            lengthAdjust="spacingAndGlyphs">CODE COUNTER</text>
+    </mask>
+  </defs>
+
+  <g fill="none"
+     stroke="#000"
+     stroke-width="18"
+     stroke-linecap="square"
+     stroke-linejoin="miter"
+     shape-rendering="geometricPrecision">
+    <rect x="52" y="52" width="1096" height="616"/>
+    <path d="M127 421H177V390H737V421H787V450H737V480H177V450H127Z"/>
+  </g>
+
+  <rect x="118" y="96" width="964" height="252" fill="#000" mask="url(#wordmark-cutout)"/>
+
+  <path d="M117 542H177V520H557V542H617V562H557V584H177V562H117Z"
+        fill="#000"
+        stroke="#000"
+        stroke-width="18"
+        stroke-linecap="square"
+        stroke-linejoin="miter"
+        shape-rendering="geometricPrecision"/>
+</svg>
