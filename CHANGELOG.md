@@ -7,6 +7,10 @@
 
 ## [未发布]
 
+暂无。
+
+## [0.2.5] - 2026-10-13
+
 ### 新增
 
 - 新增 CodeCounter Logo，提供透明 PNG 与 SVG 矢量版本。
@@ -147,7 +151,8 @@
 
 - 界面依赖 `lxn/walk`，因此本项目仅支持 Windows
 
-[未发布]: https://github.com/linfunss/codecounter/compare/v0.2.4...HEAD
+[未发布]: https://github.com/linfunss/codecounter/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/linfunss/codecounter/releases/tag/v0.2.5
 [0.2.4]: https://github.com/linfunss/codecounter/releases/tag/v0.2.4
 [0.2.3]: https://github.com/linfunss/codecounter/releases/tag/v0.2.3
 [0.2.0]: https://github.com/linfunss/codecounter/releases/tag/v0.2.0
