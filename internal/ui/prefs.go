@@ -613,7 +613,9 @@ func (p *prefsDialog) openRepoLink(link *walk.LinkLabelLink) {
 		return
 	}
 
-	if !win.ShellExecute(0, syscall.StringToUTF16Ptr("open"), syscall.StringToUTF16Ptr(url), nil, nil, win.SW_SHOWNORMAL) {
+	openPtr, openErr := syscall.UTF16PtrFromString("open")
+	urlPtr, urlErr := syscall.UTF16PtrFromString(url)
+	if openErr != nil || urlErr != nil || !win.ShellExecute(0, openPtr, urlPtr, nil, nil, win.SW_SHOWNORMAL) {
 		walk.MsgBox(p.dlg, "打开链接失败", "无法打开 "+url, walk.MsgBoxIconError)
 	}
 }
